@@ -1,0 +1,226 @@
+From 537c0f0ffcd5c29c5b536537678bf6c5cd3d670e Mon Sep 17 00:00:00 2001
+From: User <user@example.com>
+Date: Wed, 14 May 2025 17:05:37 -0300
+Subject: [PATCH] =?UTF-8?q?Implementar=20configura=C3=A7=C3=A3o=20de=20apo?=
+ =?UTF-8?q?stas=20r=C3=A1pidas=20personalizadas?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+---
+ src/app/nova-interface/page.tsx | 168 +++++++++++++++++++++++++++++++-
+ 1 file changed, 166 insertions(+), 2 deletions(-)
+
+diff --git a/src/app/nova-interface/page.tsx b/src/app/nova-interface/page.tsx
+index 3b6da3a..07a7ad6 100644
+--- a/src/app/nova-interface/page.tsx
++++ b/src/app/nova-interface/page.tsx
+@@ -73,6 +73,25 @@ export default function NovaInterface() {
+ 
+   // Estado para modal de recarga
+   const [showChatModal, setShowChatModal] = useState(false);
++  // Estado para modal de configuração de apostas rápidas
++  const [showQuickBetsModal, setShowQuickBetsModal] = useState(false);
++  // Estado para armazenar os valores personalizados de apostas rápidas
++  const [customQuickBets, setCustomQuickBets] = useState<number[]>(() => {
++    try {
++      const savedBets = localStorage.getItem('customQuickBets');
++      if (savedBets) {
++        return JSON.parse(savedBets);
++      }
++      return QUICK_BETS;
++    } catch (error) {
++      console.error('Erro ao carregar apostas rápidas personalizadas:', error);
++      return QUICK_BETS;
++    }
++  });
++  // Estado para o formulário de edição
++  const [editQuickBets, setEditQuickBets] = useState<string[]>([]);
++  // Estado para mensagem de erro das apostas rápidas
++  const [quickBetsError, setQuickBetsError] = useState<string | null>(null);
+ 
+   // Redirecionar se não estiver autenticado
+   useEffect(() => {
+@@ -744,6 +763,62 @@ export default function NovaInterface() {
+     };
+   }, [session, fetchDailyBetTotal]);
+ 
++  // Inicializar o formulário de edição com os valores atuais
++  const initEditQuickBets = () => {
++    setEditQuickBets(customQuickBets.map(bet => bet.toString()));
++    setQuickBetsError(null);
++    setShowQuickBetsModal(true);
++  };
++
++  // Validar e salvar os valores personalizados
++  const saveCustomQuickBets = () => {
++    // Converter strings para números e validar
++    const numericValues = editQuickBets.map(val => {
++      const num = parseFloat(val);
++      return isNaN(num) ? 0 : Math.round(num * 100) / 100; // Arredondar para 2 casas decimais
++    });
++
++    // Verificar valores mínimos
++    if (numericValues.some(val => val < MIN_BET_AMOUNT)) {
++      setQuickBetsError(`Todos os valores devem ser maiores ou iguais a R$ ${MIN_BET_AMOUNT}`);
++      return;
++    }
++
++    // Verificar valores máximos
++    if (numericValues.some(val => val > MAX_BET_AMOUNT)) {
++      setQuickBetsError(`Todos os valores devem ser menores ou iguais a R$ ${MAX_BET_AMOUNT}`);
++      return;
++    }
++
++    // Ordenar valores
++    const sortedValues = [...numericValues].sort((a, b) => a - b);
++
++    // Salvar no estado e no localStorage
++    setCustomQuickBets(sortedValues);
++    try {
++      localStorage.setItem('customQuickBets', JSON.stringify(sortedValues));
++    } catch (error) {
++      console.error('Erro ao salvar apostas rápidas personalizadas:', error);
++    }
++
++    // Fechar o modal
++    setShowQuickBetsModal(false);
++  };
++
++  // Resetar para os valores padrão
++  const resetQuickBets = () => {
++    setCustomQuickBets(QUICK_BETS);
++    localStorage.removeItem('customQuickBets');
++    setShowQuickBetsModal(false);
++  };
++
++  // Atualizar um valor específico no formulário
++  const updateQuickBetValue = (index: number, value: string) => {
++    const newValues = [...editQuickBets];
++    newValues[index] = value;
++    setEditQuickBets(newValues);
++  };
++
+   if (status === 'loading') {
+     return (
+       <div className="container mx-auto px-4 py-12 flex justify-center">
+@@ -848,7 +923,7 @@ export default function NovaInterface() {
+               </div>
+               
+               <div className="flex justify-center flex-wrap gap-2 mb-6">
+-                {QUICK_BETS.map((bet) => (
++                {customQuickBets.map((bet) => (
+                   <button
+                     key={bet}
+                     onClick={() => setSelectedBet(bet)}
+@@ -861,9 +936,22 @@ export default function NovaInterface() {
+                           : 'bg-[#1e1e1e] text-white hover:bg-[#1a86c7] hover:bg-opacity-30'
+                     }`}
+                   >
+-                    R$ {bet}
++                    R$ {bet.toFixed(2)}
+                   </button>
+                 ))}
++                
++                {/* Botão para configurar apostas rápidas */}
++                <button
++                  onClick={initEditQuickBets}
++                  disabled={roundStatus !== 'betting' || myBet !== null}
++                  className="px-4 py-2 rounded-md bg-[#1e1e1e] text-white hover:bg-[#1a86c7] hover:bg-opacity-30"
++                  title="Configurar valores de apostas rápidas"
++                >
++                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="inline-block">
++                    <circle cx="12" cy="12" r="3"></circle>
++                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
++                  </svg>
++                </button>
+               </div>
+               
+               <div className="text-center text-xs text-gray-400 mb-2">
+@@ -1019,6 +1107,82 @@ export default function NovaInterface() {
+           </div>
+         </div>
+       </div>
++
++      {/* Modal de Configuração de Apostas Rápidas */}
++      <div
++        className={`fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-70 transition-all duration-200 ${showQuickBetsModal ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
++        onClick={() => setShowQuickBetsModal(false)}
++      >
++        <div
++          className="bg-[#121212] rounded-lg shadow-xl max-w-md w-full border border-gray-800"
++          onClick={e => e.stopPropagation()}
++        >
++          <div className="p-4 border-b border-gray-800 flex justify-between items-center">
++            <h3 className="text-lg font-medium">Configurar Apostas Rápidas</h3>
++            <button
++              onClick={() => setShowQuickBetsModal(false)}
++              className="text-gray-400 hover:text-white"
++            >
++              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
++                <line x1="18" y1="6" x2="6" y2="18"></line>
++                <line x1="6" y1="6" x2="18" y2="18"></line>
++              </svg>
++            </button>
++          </div>
++          <div className="p-6">
++            <p className="text-sm text-gray-400 mb-4">
++              Configure os valores de apostas rápidas de acordo com sua preferência.
++              Os valores devem estar entre R$ {MIN_BET_AMOUNT.toFixed(2)} e R$ {MAX_BET_AMOUNT.toFixed(2)}.
++            </p>
++            
++            {quickBetsError && (
++              <div className="mb-4 p-3 bg-red-500 bg-opacity-20 border border-red-500 rounded-md text-red-400 text-sm">
++                {quickBetsError}
++              </div>
++            )}
++            
++            <div className="grid grid-cols-2 gap-4 mb-6">
++              {editQuickBets.map((value, index) => (
++                <div key={index} className="flex flex-col">
++                  <label className="text-sm text-gray-400 mb-1">Valor {index + 1}</label>
++                  <div className="relative">
++                    <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">R$</span>
++                    <input
++                      type="number"
++                      value={value}
++                      onChange={(e) => updateQuickBetValue(index, e.target.value)}
++                      min={MIN_BET_AMOUNT}
++                      max={MAX_BET_AMOUNT}
++                      step="1"
++                      className="w-full pl-9 pr-3 py-2 bg-[#1e1e1e] rounded-md border border-gray-700 text-white"
++                    />
++                  </div>
++                </div>
++              ))}
++            </div>
++            
++            <div className="flex justify-between">
++              <Button 
++                variant="outline" 
++                onClick={resetQuickBets}
++              >
++                Restaurar Padrão
++              </Button>
++              <Button 
++                variant="primary" 
++                onClick={saveCustomQuickBets}
++              >
++                Salvar Configurações
++              </Button>
++            </div>
++            
++            <div className="mt-6 text-xs text-gray-400">
++              <p>Os valores serão ordenados automaticamente do menor para o maior após salvar.</p>
++              <p>Suas configurações ficarão salvas mesmo após fechar o navegador.</p>
++            </div>
++          </div>
++        </div>
++      </div>
+     </div>
+   );
+ } 
+\ No newline at end of file
+-- 
+2.49.0.windows.1
+

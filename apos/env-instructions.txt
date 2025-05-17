@@ -1,0 +1,24 @@
+# Instruções para configurar o arquivo .env.local
+
+Para corrigir os problemas de autenticação e configurar o modo de manutenção, crie um arquivo chamado `.env.local` na raiz do projeto 
+(mesmo nível que o package.json) com o seguinte conteúdo:
+
+```
+DATABASE_URL="postgresql://postgres:sosederbele@localhost:5432/torch"
+NEXTAUTH_SECRET="green-game-secret-key-123"
+NEXTAUTH_URL="http://localhost:3000"
+JWT_SECRET="jwt-secret-key-for-green-game-123"
+
+# Configurações para controle de manutenção
+ADMIN_API_TOKEN="token-secreto-para-api-admin-123"
+ADMIN_BYPASS_TOKEN="token-para-bypass-manutencao-123"
+STATUS_API_TOKEN="token-para-verificacao-status-123"
+```
+
+Após criar este arquivo, reinicie o servidor com `npm run dev`.
+
+Para o controle de manutenção funcionar corretamente, também é necessário:
+1. Garantir que a pasta `data` exista na raiz do projeto (o sistema tentará criá-la automaticamente)
+2. O usuário que executa o servidor deve ter permissão de escrita nesta pasta
+
+Se encontrar erro relacionado a "use client", adicione a diretiva "use client" no topo dos componentes que usam hooks React.

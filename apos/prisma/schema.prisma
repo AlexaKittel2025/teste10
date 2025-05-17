@@ -1,0 +1,298 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String        @id @default(cuid())
+  email         String        @unique
+  password      String
+  name          String
+  phone         String?
+  address       String?
+  balance       Float         @default(0)
+  role          Role          @default(USER)
+  dailyBetLimit Float         @default(5000) // Limite diário de apostas padrão: R$ 5000
+  totalBets     Float         @default(0)    // Total de apostas realizadas
+  
+  // Sistema de níveis e recompensas
+  level         Int           @default(1)    // Nível do jogador
+  xp            Int           @default(0)    // Pontos de experiência
+  loyaltyPoints Int           @default(0)    // Pontos de fidelidade
+  totalPlayed   Int           @default(0)    // Total de rodadas jogadas
+  daysActive    Int           @default(1)    // Dias de atividade
+  lastActive    DateTime      @default(now()) // Última atividade
+  
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  bets          Bet[]
+  transactions  Transaction[]
+  messages      ChatMessage[]
+  rewards       Reward[]      // Relação com as recompensas
+  cashOuts      CashOut[]     // Relação com cash-outs do jogo Multiplicador
+  settings      UserSettings? // Relação com configurações do usuário
+  
+  // Sistema de amigos
+  sentFriendships     Friendship[] @relation("SentFriendships")
+  receivedFriendships Friendship[] @relation("ReceivedFriendships")
+  userStatus          UserStatus?  // Status online do usuário
+}
+
+// Configurações personalizadas do usuário
+model UserSettings {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id])
+  dailyBetLimit Float?   // Limite diário personalizado
+  theme         String?  // Tema da interface
+  notifications Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Bet {
+  id          String      @id @default(cuid())
+  userId      String
+  gameType    String      @default("crash") // Tipo de jogo: "crash", "multiplicador", etc.
+  amount      Float
+  type        BetType?    // Para jogos tipo crash
+  status      String      @default("PENDING") // "PENDING", "COMPLETED", "CANCELED"
+  result      Float?      // Resultado (multiplicador)
+  winAmount   Float?      // Valor ganho (se houver)
+  createdAt   DateTime    @default(now())
+  completedAt DateTime?   // Quando a aposta foi finalizada
+  roundId     String
+  user        User        @relation(fields: [userId], references: [id])
+  cashOut     CashOut?    // Relação com cash-out (Multiplicador)
+  round       Round?      @relation(fields: [roundId], references: [id])
+}
+
+// Renomeando para Round para compatibilidade
+model Round {
+  id          String      @id @default(cuid())
+  result      Float
+  startTime   DateTime    @default(now())
+  endTime     DateTime
+  status      RoundStatus @default(BETTING)
+  houseProfit Float       @default(0)
+  bets        Bet[]
+}
+
+// Novo modelo para rodadas do jogo Multiplicador
+model GameRound {
+  id          String    @id @default(cuid())
+  gameType    String    // "multiplicador"
+  startTime   DateTime  @default(now())
+  endTime     DateTime?
+  status      String    @default("BETTING") // "BETTING", "RUNNING", "FINISHED"
+  result      Float?    // Multiplicador final da rodada
+  totalBets   Int       @default(0)
+  totalAmount Float     @default(0)
+  houseProfit Float     @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  cashOuts    CashOut[] // Relação com cash-outs desta rodada
+}
+
+model Transaction {
+  id           String            @id @default(cuid())
+  userId       String
+  amount       Float
+  type         TransactionType
+  status       TransactionStatus @default(PENDING)
+  details      String?           @default("{}")
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  pixCode      String?           // Código PIX para pagamento
+  pixExpiration DateTime?        // Data de expiração do código PIX
+  externalId   String?           // ID externo da transação na plataforma de pagamento
+  paymentUrl   String?           // URL para pagamento externo
+  qrCodeImage  String?           // URL ou base64 do QR Code
+  user         User              @relation(fields: [userId], references: [id])
+  notifications PaymentNotification?
+}
+
+// Modelo para notificações de pagamento
+model PaymentNotification {
+  id            String     @id @default(cuid())
+  transactionId String     @unique
+  externalId    String     // ID externo do pagamento
+  status        String     // Status retornado pelo webhook
+  payload       String     // Payload completo do webhook
+  createdAt     DateTime   @default(now())
+  transaction   Transaction @relation(fields: [transactionId], references: [id])
+}
+
+// Novo modelo para cash-out do jogo Multiplicador
+model CashOut {
+  id         String    @id @default(cuid())
+  userId     String
+  betId      String    @unique
+  roundId    String
+  multiplier Float     // Multiplicador no momento do cash-out
+  amount     Float     // Valor recebido
+  createdAt  DateTime  @default(now())
+  user       User      @relation(fields: [userId], references: [id])
+  bet        Bet       @relation(fields: [betId], references: [id])
+  gameRound  GameRound @relation(fields: [roundId], references: [id])
+}
+
+// Novo modelo para armazenar o saldo da casa
+model HouseBalance {
+  id            String   @id @default(cuid())
+  gameType      String   @unique // "multiplicador"
+  balance       Float    @default(100000) // Saldo inicial: 100.000
+  profitMargin  Float    @default(5) // Margem de lucro em %
+  totalBets     Int      @default(0)
+  totalBetAmount Float   @default(0)
+  totalPayout   Float    @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model ChatMessage {
+  id           String    @id @default(cuid())
+  text         String
+  sender       String    @default("USER") // "USER", "ADMIN", "SYSTEM"
+  userId       String?
+  userName     String?
+  userEmail    String?
+  recipientId  String?   // ID do destinatário se for mensagem direta
+  timestamp    DateTime  @default(now())
+  read         Boolean   @default(false)
+  isFinal      Boolean   @default(false)
+  isImage      Boolean   @default(false)
+  fileInfo     Json?     // Armazenar informações de arquivo como JSON
+  expiresAt    DateTime  // Data de expiração (24h após a criação)
+  user         User?     @relation(fields: [userId], references: [id])
+}
+
+// Modelo para armazenar configurações do sistema
+model SystemConfig {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Modelo para armazenar configurações gerais (incluindo contagem de jogadores)
+model Settings {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Novo modelo para definir os níveis e seus requisitos/benefícios
+model PlayerLevel {
+  id                 String   @id @default(cuid())
+  level              Int      @unique
+  name               String   // Nome do nível (ex: "Iniciante", "Prata", "Ouro", etc.)
+  requiredXP         Int      // XP necessário para alcançar este nível
+  bonusMultiplier    Float    @default(0)  // Bônus de multiplicador para apostas (em %)
+  loyaltyMultiplier  Float    @default(1)  // Multiplicador de pontos de fidelidade
+  dailyBonus         Int      @default(0)  // Bônus diário de pontos
+  description        String?  // Descrição do nível
+  icon               String?  // URL para o ícone do nível
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+// Modelo para recompensas que podem ser compradas com pontos de fidelidade
+model Reward {
+  id                String   @id @default(cuid())
+  name              String
+  description       String
+  pointsCost        Int      // Custo em pontos de fidelidade
+  type              RewardType
+  value             Float    // Valor da recompensa (depende do tipo)
+  icon              String?  // URL para o ícone da recompensa
+  isActive          Boolean  @default(true)
+  minimumLevel      Int      @default(1)   // Nível mínimo para resgatar
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  // Relacionamento com usuários que resgataram
+  redeemedBy        User[]
+}
+
+// Modelo para registrar histórico de resgates de recompensas
+model RewardRedemption {
+  id        String   @id @default(cuid())
+  userId    String
+  rewardId  String
+  points    Int      // Pontos gastos
+  createdAt DateTime @default(now())
+}
+
+// Sistema de amizades entre usuários
+model Friendship {
+  id          String   @id @default(cuid())
+  userId      String
+  friendId    String
+  status      String   @default("PENDING") // "PENDING", "ACCEPTED", "REJECTED", "BLOCKED"
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  user        User     @relation("SentFriendships", fields: [userId], references: [id], onDelete: Cascade)
+  friend      User     @relation("ReceivedFriendships", fields: [friendId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, friendId])
+}
+
+// Status online dos usuários
+model UserStatus {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  isOnline        Boolean  @default(false)
+  lastSeen        DateTime @default(now())
+  currentActivity String?  // O que o usuário está fazendo atualmente (ex: "Jogando", "Configurações")
+  updatedAt       DateTime @updatedAt
+  
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum BetType {
+  ABOVE
+  BELOW
+}
+
+enum BetResult {
+  WIN
+  LOSE
+}
+
+enum TransactionType {
+  DEPOSIT
+  WITHDRAWAL
+}
+
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  REJECTED
+}
+
+enum RoundStatus {
+  BETTING
+  RUNNING
+  FINISHED
+}
+
+enum RewardType {
+  FREE_BET          // Aposta gratuita
+  MULTIPLIER_BOOST  // Aumento temporário de multiplicador
+  CASH_BONUS        // Bônus em dinheiro
+  DAILY_LIMIT_BOOST // Aumento temporário do limite diário
+}
