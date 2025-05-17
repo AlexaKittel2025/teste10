@@ -1315,7 +1315,7 @@ export default function NewGame() {
   }
   
   return (
-    <div className="container mx-auto px-4 py-8 max-w-7xl">
+    <div className="container mx-auto px-3 py-3 sm:px-4 sm:py-6 md:py-8 max-w-7xl">
       {/* Tutorial Component */}
       <GameTutorial 
         isVisible={showTutorial}
@@ -1324,25 +1324,25 @@ export default function NewGame() {
       />
       
       {/* Help & Tooltips Buttons */}
-      <div className="fixed bottom-4 right-4 z-50 flex space-x-3">
+      <div className="fixed bottom-20 sm:bottom-4 right-4 z-50 flex flex-col sm:flex-row gap-2 sm:gap-3">
         <Button
           variant="secondary"
-          className={`rounded-full w-12 h-12 flex items-center justify-center ${
+          className={`rounded-full w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center ${
             tooltipsEnabled ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-700 hover:bg-gray-600'
           } shadow-lg transition-all duration-300`}
           onClick={toggleTooltips}
         >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 sm:h-6 sm:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
         </Button>
         
         <Button
           variant="secondary"
-          className="rounded-full w-12 h-12 flex items-center justify-center bg-[#3bc37a] hover:bg-[#2bb167] shadow-lg"
+          className="rounded-full w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center bg-[#3bc37a] hover:bg-[#2bb167] shadow-lg"
           onClick={() => setShowTutorial(true)}
         >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 sm:h-6 sm:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
         </Button>
@@ -1359,15 +1359,15 @@ export default function NewGame() {
         />
       )}
       
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
         {/* Área principal do jogo */}
-        <Card variant="bordered" className="md:col-span-2 border border-gray-800 bg-gradient-to-b from-[#121212] to-[#0c0c0c] shadow-xl overflow-hidden h-full">
-          <CardHeader className={`border-b border-gray-800/60 bg-[#111]/50 backdrop-blur-sm flex justify-between items-start p-4 ${
+        <Card variant="bordered" className="lg:col-span-2 border border-gray-800 bg-gradient-to-b from-[#121212] to-[#0c0c0c] shadow-xl overflow-hidden h-full order-1 lg:order-1">
+          <CardHeader className={`border-b border-gray-800/60 bg-[#111]/50 backdrop-blur-sm flex flex-col sm:flex-row justify-between items-start sm:items-center p-3 sm:p-4 gap-2 sm:gap-0 ${
             currentPhase === 'running' ? 'animate-fadeIn' : ''
           }`}>
             <div className="animate-fadeInLeft">
-              <CardTitle className="flex items-center text-2xl">
-                <span className={`inline-block w-3 h-3 rounded-full mr-2 ${
+              <CardTitle className="flex flex-wrap items-center text-lg sm:text-xl md:text-2xl gap-1 sm:gap-2">
+                <span className={`inline-block w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full mr-1 sm:mr-2 ${
                   currentPhase === 'running' 
                     ? 'bg-green-500 animate-pulse' 
                     : currentPhase === 'betting'
@@ -1378,14 +1378,14 @@ export default function NewGame() {
                 
                 {/* Indicador de evento sazonal ativo */}
                 {activeSeason && (
-                  <span className="ml-2 text-sm px-2 py-1 rounded-full bg-purple-500/20 border border-purple-500/30 text-purple-300 animate-pulse">
+                  <span className="text-xs sm:text-sm px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full bg-purple-500/20 border border-purple-500/30 text-purple-300 animate-pulse">
                     {activeSeason.name} Event
                   </span>
                 )}
                 
                 {/* Indicador de apostas automáticas */}
                 {isAutoBetting && (
-                  <span className="ml-2 text-sm px-2 py-1 rounded-full bg-blue-500/20 border border-blue-500/30 text-blue-300 animate-custom-pulse">
+                  <span className="text-xs sm:text-sm px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full bg-blue-500/20 border border-blue-500/30 text-blue-300 animate-custom-pulse">
                     Auto Betting
                   </span>
                 )}
@@ -1396,7 +1396,7 @@ export default function NewGame() {
                   : 'Aposte e escolha o momento certo para fazer CashOut'}
               </CardDescription>
             </div>
-            <div className={`rounded-lg px-3 py-2 backdrop-blur-sm shadow-md transition-all duration-500 game-phase-indicator ${
+            <div className={`rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 backdrop-blur-sm shadow-md transition-all duration-500 game-phase-indicator ${
               currentPhase === 'betting' 
                 ? 'bg-blue-500/10 border border-blue-500/40 animate-fadeInRight' 
                 : currentPhase === 'running'
@@ -1414,12 +1414,12 @@ export default function NewGame() {
                 position="left"
                 className={tooltipsEnabled ? '' : 'hidden'}
               >
-                <div className="text-xs text-gray-400 uppercase tracking-wider mb-1 text-center animate-fadeIn">
+                <div className="text-[10px] sm:text-xs text-gray-400 uppercase tracking-wider mb-0.5 sm:mb-1 text-center animate-fadeIn">
                   {currentPhase === 'betting' && 'Fase de apostas'}
                   {currentPhase === 'running' && 'Fase de jogo'}
                   {currentPhase === 'ended' && 'Jogo finalizado'}
                 </div>
-                <div className={`text-lg font-bold text-center animate-scaleIn ${
+                <div className={`text-base sm:text-lg font-bold text-center animate-scaleIn ${
                   currentPhase === 'betting'
                     ? 'bg-gradient-to-r from-[#4287f5] to-[#42c5f5] bg-clip-text text-transparent'
                     : currentPhase === 'running'
@@ -1434,7 +1434,7 @@ export default function NewGame() {
           <CardContent className="p-0">
             <div className="p-4">
               {/* Área do gráfico e multiplicador */}
-              <div className={`relative h-80 bg-gradient-to-b from-[#0a0a0a] to-[#090909] rounded-xl mb-4 overflow-hidden border ${
+              <div className={`relative h-64 sm:h-72 md:h-80 bg-gradient-to-b from-[#0a0a0a] to-[#090909] rounded-xl mb-3 sm:mb-4 overflow-hidden border ${
                 currentPhase === 'running' 
                   ? 'border-green-500/20 animate-blink-border' 
                   : currentPhase === 'betting'
@@ -1448,7 +1448,7 @@ export default function NewGame() {
                     position="top"
                     className={tooltipsEnabled ? '' : 'hidden'}
                   >
-                    <div className={`text-6xl font-bold transition-all duration-300 animate-scaleIn ${
+                    <div className={`text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold transition-all duration-300 animate-scaleIn ${
                       currentPhase === 'running' 
                         ? getMultiplierColor(currentMultiplier)
                         : 'bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent'
@@ -1462,11 +1462,11 @@ export default function NewGame() {
                 
                 {/* Exibir CashOut feito */}
                 {cashedOut && cashOutMultiplier && (
-                  <div className="absolute top-4 right-4 bg-black/80 backdrop-blur-sm rounded-lg px-4 py-2 border border-green-500/40 z-20 shadow-lg shadow-green-500/10 animate-slideInRight">
-                    <div className="text-green-500 font-bold animate-fadeIn">
+                  <div className="absolute top-2 sm:top-4 right-2 sm:right-4 bg-black/80 backdrop-blur-sm rounded-lg px-2 sm:px-4 py-1.5 sm:py-2 border border-green-500/40 z-20 shadow-lg shadow-green-500/10 animate-slideInRight">
+                    <div className="text-green-500 font-bold animate-fadeIn text-sm sm:text-base">
                       Cash Out em {cashOutMultiplier.toFixed(2)}x
                     </div>
-                    <div className="text-white animate-fadeIn delay-200">
+                    <div className="text-white animate-fadeIn delay-200 text-xs sm:text-sm">
                       Ganho: R$ {((placedBet?.amount || 0) * cashOutMultiplier).toFixed(2)}
                     </div>
                   </div>
@@ -1474,11 +1474,11 @@ export default function NewGame() {
                 
                 {/* Resultado final */}
                 {currentPhase === 'ended' && winAmount !== null && !cashedOut && (
-                  <div className="absolute top-4 right-4 bg-black/80 backdrop-blur-sm rounded-lg px-4 py-2 border border-red-500/40 z-20 shadow-lg shadow-red-500/10 animate-slideInRight">
-                    <div className={`${winAmount > 0 ? "text-green-500 font-bold" : "text-red-500 font-bold"} animate-fadeIn`}>
+                  <div className="absolute top-2 sm:top-4 right-2 sm:right-4 bg-black/80 backdrop-blur-sm rounded-lg px-2 sm:px-4 py-1.5 sm:py-2 border border-red-500/40 z-20 shadow-lg shadow-red-500/10 animate-slideInRight">
+                    <div className={`${winAmount > 0 ? "text-green-500 font-bold" : "text-red-500 font-bold"} animate-fadeIn text-sm sm:text-base`}>
                       {winAmount > 0 ? 'Você ganhou!' : 'Você perdeu!'}
                     </div>
-                    <div className="text-white animate-fadeIn delay-200">
+                    <div className="text-white animate-fadeIn delay-200 text-xs sm:text-sm">
                       {Math.abs(winAmount).toFixed(2)} reais
                     </div>
                   </div>
@@ -1500,8 +1500,8 @@ export default function NewGame() {
                 {!socketInitialized && (
                   <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-50">
                     <div className="text-center">
-                      <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
-                      <div className="text-white">Conectando ao servidor...</div>
+                      <div className="animate-spin w-6 h-6 sm:w-8 sm:h-8 border-[3px] sm:border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-3 sm:mb-4"></div>
+                      <div className="text-white text-sm sm:text-base">Conectando ao servidor...</div>
                     </div>
                   </div>
                 )}
@@ -1509,17 +1509,17 @@ export default function NewGame() {
             </div>
             
             {/* Área de apostas */}
-            <div className="bg-[#0a0a0a] border-t border-gray-800/50 rounded-b-lg p-4">
+            <div className="bg-[#0a0a0a] border-t border-gray-800/50 rounded-b-lg p-3 sm:p-4">
               {/* Mensagem de erro */}
               {errorMessage && (
-                <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-md text-red-400 text-sm shadow-sm">
+                <div className="mb-3 sm:mb-4 p-2.5 sm:p-3 bg-red-500/10 border border-red-500/30 rounded-md text-red-400 text-xs sm:text-sm shadow-sm">
                   <div className="flex items-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1.5 sm:mr-2 flex-shrink-0">
                       <circle cx="12" cy="12" r="10"></circle>
                       <line x1="12" y1="8" x2="12" y2="12"></line>
                       <line x1="12" y1="16" x2="12.01" y2="16"></line>
                     </svg>
-                    {errorMessage}
+                    <span className="break-words">{errorMessage}</span>
                   </div>
                 </div>
               )}
@@ -1527,14 +1527,14 @@ export default function NewGame() {
               {/* Fase de apostas - mostrar sempre na fase de apostas e quando não tiver aposta colocada */}
               {currentPhase === 'betting' && !placedBet && (
                 <div className="animate-fadeInUp">
-                  <div className="mb-4">
-                    <div className="text-sm text-gray-400 uppercase tracking-wider mb-2">Valor da aposta</div>
+                  <div className="mb-3 sm:mb-4">
+                    <div className="text-xs sm:text-sm text-gray-400 uppercase tracking-wider mb-1.5 sm:mb-2">Valor da aposta</div>
                     <QuickBetButtons
                       defaultBets={QUICK_BETS}
                       userBalance={userBalance}
                       onSelectBet={(bet) => setBetAmount(bet)}
                       selectedBet={betAmount}
-                      className="mb-3"
+                      className="mb-2 sm:mb-3"
                     />
                     
                     {/* Input personalizado */}
@@ -1545,7 +1545,7 @@ export default function NewGame() {
                         min={MIN_BET_AMOUNT}
                         max={MAX_BET_AMOUNT}
                         step="5"
-                        className="bg-[#1e1e1e] border-gray-800"
+                        className="bg-[#1e1e1e] border-gray-800 h-10 sm:h-11 text-sm sm:text-base"
                         value={betAmount}
                         onChange={(e) => {
                           const value = e.target.value;
@@ -1566,7 +1566,7 @@ export default function NewGame() {
                   {/* Botão de apostar */}
                   <Button 
                     variant="primary" 
-                    className={`w-full px-6 py-3 text-lg font-medium transition-all duration-300 animate-fadeIn delay-500 ${
+                    className={`w-full px-4 sm:px-6 py-2.5 sm:py-3 text-base sm:text-lg font-medium transition-all duration-300 animate-fadeIn delay-500 ${
                       !betAmount || isNaN(Number(betAmount)) || betAmount < MIN_BET_AMOUNT || betAmount > userBalance || isLoading
                         ? 'opacity-70'
                         : betAmount >= 50 
@@ -1585,11 +1585,11 @@ export default function NewGame() {
                   >
                     {isLoading ? (
                       <div className="flex items-center justify-center">
-                        <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <svg className="animate-spin -ml-1 mr-1.5 sm:mr-2 h-4 w-4 sm:h-5 sm:w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
-                        Processando...
+                        <span className="text-sm sm:text-base">Processando...</span>
                       </div>
                     ) : 'Fazer Aposta'}
                   </Button>
@@ -1622,7 +1622,7 @@ export default function NewGame() {
           </CardContent>
           
           {/* Últimos Resultados */}
-          <div className="px-4 pb-6 pt-2 border-t border-gray-800/50 bg-[#0c0c0c] last-results">
+          <div className="px-3 sm:px-4 pb-4 sm:pb-6 pt-2 border-t border-gray-800/50 bg-[#0c0c0c] last-results">
             <Tooltip
               content="Veja os multiplicadores das últimas rodadas para identificar padrões"
               position="top"
@@ -1642,23 +1642,23 @@ export default function NewGame() {
         </Card>
         
         {/* Área lateral */}
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6 order-2 lg:order-2">
           {/* Cartão de informações financeiras */}
           <Card variant="bordered" className="border border-gray-800 bg-[#0f0f0f] shadow-lg">
-            <CardHeader className="p-4 border-b border-gray-800/40">
-              <CardTitle>Seu Saldo</CardTitle>
-              <CardDescription>Informações da sua conta</CardDescription>
+            <CardHeader className="p-3 sm:p-4 border-b border-gray-800/40">
+              <CardTitle className="text-base sm:text-lg">Seu Saldo</CardTitle>
+              <CardDescription className="text-xs sm:text-sm">Informações da sua conta</CardDescription>
             </CardHeader>
-            <CardContent className="p-4">
+            <CardContent className="p-3 sm:p-4">
               <div className="mb-6">
-                <p className="text-sm text-gray-400 mb-1">Saldo Disponível</p>
-                <p className="text-3xl font-bold bg-gradient-to-r from-[#1a86c7] to-[#3bc37a] bg-clip-text text-transparent">
+                <p className="text-xs sm:text-sm text-gray-400 mb-1">Saldo Disponível</p>
+                <p className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-[#1a86c7] to-[#3bc37a] bg-clip-text text-transparent">
                   R$ {userBalance.toFixed(2)}
                 </p>
               </div>
 
               <div>
-                <p className="text-sm text-gray-400 mb-1">Limite Diário de Apostas</p>
+                <p className="text-xs sm:text-sm text-gray-400 mb-1">Limite Diário de Apostas</p>
                 <div className="w-full bg-gray-800 rounded-full h-2.5">
                   <div
                     className={`h-2.5 rounded-full ${
@@ -1683,11 +1683,11 @@ export default function NewGame() {
                 </div>
               </div>
             </CardContent>
-            <CardFooter className="flex justify-between gap-2 p-4 border-t border-gray-800/40">
-              <Button variant="primary" onClick={() => router.push('/profile')} className="flex-1">
+            <CardFooter className="flex justify-between gap-2 p-3 sm:p-4 border-t border-gray-800/40">
+              <Button variant="primary" onClick={() => router.push('/profile')} className="flex-1 h-9 sm:h-10 text-xs sm:text-sm">
                 Ver Perfil
               </Button>
-              <Button variant="secondary" onClick={() => router.push('/new-interface')} className="flex-1">
+              <Button variant="secondary" onClick={() => router.push('/new-interface')} className="flex-1 h-9 sm:h-10 text-xs sm:text-sm">
                 Voltar
               </Button>
             </CardFooter>
@@ -1754,11 +1754,8 @@ export default function NewGame() {
       {/* Chat flutuante - aparece quando showChat é true */}
       {showChat && (
         <div 
-          className="fixed z-50 right-4 bottom-4 md:right-6 md:bottom-6 lg:right-8 lg:bottom-8 flex items-end"
+          className="fixed z-50 right-2 bottom-16 sm:bottom-4 md:right-6 md:bottom-6 lg:right-8 lg:bottom-8 flex items-end w-[calc(100%-1rem)] sm:w-[calc(100%-2rem)] max-w-[95vw] sm:max-w-[400px] h-[min(500px,calc(100vh-8rem))] sm:h-[min(600px,calc(100vh-6rem))]"
           style={{ 
-            width: 'calc(100% - 2rem)',
-            maxWidth: '400px',
-            height: 'min(600px, calc(100vh - 6rem))',
             filter: 'drop-shadow(0 20px 13px rgba(0, 0, 0, 0.4)) drop-shadow(0 8px 5px rgba(79, 70, 229, 0.1))',
             animation: 'fadeInUp 0.3s ease-out',
           }}

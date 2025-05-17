@@ -115,6 +115,28 @@ body {
   }
 }
 
+@keyframes fadeInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes fadeInRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
 @keyframes pulse {
   0% {
     transform: scale(1);
@@ -156,6 +178,14 @@ body {
 
 .animate-fadeInDown {
   animation: fadeInDown 0.5s ease-out;
+}
+
+.animate-fadeInLeft {
+  animation: fadeInLeft 0.5s ease-out;
+}
+
+.animate-fadeInRight {
+  animation: fadeInRight 0.5s ease-out;
 }
 
 .animate-scaleIn {
