@@ -96,16 +96,18 @@ export default function NewGame() {
   // Quick bets
   const QUICK_BETS = [5, 10, 20, 50, 100];
   const [customQuickBets, setCustomQuickBets] = useState<number[]>(() => {
-    try {
-      const savedBets = localStorage.getItem('customQuickBets');
-      if (savedBets) {
-        return JSON.parse(savedBets);
+    // Verificar se estamos no cliente antes de acessar localStorage
+    if (typeof window !== 'undefined') {
+      try {
+        const savedBets = localStorage.getItem('customQuickBets');
+        if (savedBets) {
+          return JSON.parse(savedBets);
+        }
+      } catch (error) {
+        console.error('Erro ao carregar apostas rápidas personalizadas:', error);
       }
-      return QUICK_BETS;
-    } catch (error) {
-      console.error('Erro ao carregar apostas rápidas personalizadas:', error);
-      return QUICK_BETS;
     }
+    return QUICK_BETS;
   });
   
   // Atualizar a lista de apostas rápidas
@@ -430,18 +432,21 @@ export default function NewGame() {
         ...prev.slice(0, 9)
       ]);
       
-      // Verificar se o jogador ganhou
+      // Processar resultado para o jogador (sempre ganha o valor multiplicado)
       if (placedBet && !cashedOut) {
-        if (finalMultiplier >= 1.0) {
-          // Jogador ganhou
-          const winningAmount = placedBet.amount * finalMultiplier;
-          setWinAmount(winningAmount);
-          updateBalance(userBalance + winningAmount);
-        } else {
-          // Jogador perdeu
-          const lossAmount = placedBet.amount * finalMultiplier;
-          setWinAmount(-lossAmount);
-        }
+        // Calcular ganho (independente do multiplicador ser < 1.0)
+        const winningAmount = placedBet.amount * finalMultiplier;
+        console.log('Processando resultado final:', {
+          placedBet: placedBet.amount,
+          multiplicador: finalMultiplier,
+          ganho: winningAmount
+        });
+        
+        // Definir o valor ganho para exibição
+        setWinAmount(winningAmount);
+        
+        // Atualizar saldo do usuário
+        updateBalance(userBalance + winningAmount);
       }
       
       // Atualizar saldo de qualquer forma
@@ -981,12 +986,32 @@ export default function NewGame() {
         } 
         
         // Sempre definir o estado localmente também para garantir que a interface é atualizada
-        console.log('Definindo placedBet localmente para garantir atualização da UI');
+        console.log('Definindo placedBet localmente e atualizando saldo do usuário');
         setPlacedBet({
           amount: amountToUse,
           timestamp: Date.now()
         });
-        updateBalance(userBalance - amountToUse);
+        
+        // Atualizar o saldo local com o valor da resposta do servidor, caso disponível
+        let newBalance = userBalance - amountToUse;
+        
+        // Se o servidor retornou um novo saldo, usar esse valor
+        if (responseData && responseData.newBalance !== undefined) {
+          console.log('Servidor retornou novo saldo:', responseData.newBalance);
+          newBalance = responseData.newBalance;
+        } else {
+          console.log('Servidor não retornou saldo, usando cálculo local');
+        }
+        
+        // Atualizar o saldo local e forçar um refresh para garantir sincronização
+        updateBalance(newBalance);
+        setTimeout(refreshBalance, 500); // Fazer um refresh do saldo após 500ms
+        
+        console.log('Saldo atualizado após aposta:', {
+          valorAposta: amountToUse,
+          saldoAnterior: userBalance,
+          novoSaldo: newBalance
+        });
         return true;
       } else {
         // Falha - mostrar erro

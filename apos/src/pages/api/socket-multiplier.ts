@@ -49,14 +49,14 @@ interface GameState {
   targetEndValue?: number;
 }
 
-// Constantes de tempo
-const BETTING_PHASE_DURATION = 5000; // 5 segundos para apostas
-const ROUND_DURATION = 20000; // 20 segundos para a rodada em execução
-
-// Constantes do jogo
+// Constantes do jogo - estáticas, não mudam em tempo real
 const INITIAL_MULTIPLIER = 1.0; // Multiplicador inicial
 const MAX_MULTIPLIER = 2.0; // Multiplicador máximo
 const MIN_MULTIPLIER = 0.0; // Multiplicador mínimo
+
+// Configurações de duração - precisam ser declaradas antes de usar
+const BETTING_PHASE_DURATION_DEFAULT = 5000; // 5 segundos para apostas (padrão)
+const ROUND_DURATION_DEFAULT = 20000; // 20 segundos para a rodada em execução (padrão)
 
 // Estado do jogo
 let gameState: GameState = {
@@ -66,9 +66,9 @@ let gameState: GameState = {
   players: {},
   bets: [],
   cashOuts: [],
-  timeLeft: BETTING_PHASE_DURATION,
+  timeLeft: BETTING_PHASE_DURATION_DEFAULT,
   startTime: Date.now(),
-  endTime: Date.now() + BETTING_PHASE_DURATION,
+  endTime: Date.now() + BETTING_PHASE_DURATION_DEFAULT,
 };
 
 // Armazenar a instância do servidor para evitar recriação
@@ -120,44 +120,97 @@ const MultiplierSocketHandler = async (req: NextApiRequest, res: NextApiResponse
   let activeConnections = 0;
   let isFirstInitialization = !gameState.roundId;
 
-  // Variáveis para controlar a evolução do multiplicador
+  // Variáveis para controlar a evolução do multiplicador - valores iniciais que podem ser sobrescritos pela configuração
   let trendDirection = 0; // -1 (diminuindo), 0 (neutro), 1 (aumentando)
-  let trendStrength = 0.5; // Força da tendência atual (0 a 1)
+  let trendStrength = 0.7; // Força da tendência atual (0 a 1) - Aumentada para 0.7
   let trendDuration = 0; // Duração restante da tendência atual
-  let volatility = 0.5; // Volatilidade atual (0 a 1)
-  let crashProbability = 0.1; // Probabilidade de "quebra" (multiplicador cair drasticamente)
+  let volatility = 0.75; // Volatilidade atual (0 a 1) - Aumentada para 0.75
+  let crashProbability = 0.25; // Probabilidade de "quebra" (multiplicador cair drasticamente) - Aumentada para 25%
+  let aboveOneProbability = 0.3; // Probabilidade de resultado acima de 1.0 (0-1)
+  
+  // Configurações de duração - valores que podem ser sobrescritos pela configuração do banco
+  let BETTING_PHASE_DURATION = BETTING_PHASE_DURATION_DEFAULT; // Usar valor padrão inicialmente
+  let ROUND_DURATION = ROUND_DURATION_DEFAULT; // Usar valor padrão inicialmente
 
-  // Buscar configurações da casa do banco de dados
-  const loadHouseConfig = async () => {
+  // Buscar todas as configurações do jogo do banco de dados
+  const loadGameConfig = async () => {
     try {
-      // @ts-ignore - O modelo houseBalance existe no schema mas não no tipo PrismaClient
-      const houseBalance = await prisma.houseBalance.findFirst({
-        where: { gameType: "multiplicador" }
-      });
-      
-      if (houseBalance) {
-        houseConfig = {
-          profitMargin: houseBalance.profitMargin,
-          balance: houseBalance.balance,
-          totalBets: houseBalance.totalBets,
-          totalBetAmount: houseBalance.totalBetAmount,
-          totalPayout: houseBalance.totalPayout
-        };
-        console.log('Configurações da casa carregadas do banco de dados:', houseConfig);
-      } else {
-        // Criar registro inicial
+      // Parte 1: Carregar configuração financeira da casa
+      try {
         // @ts-ignore - O modelo houseBalance existe no schema mas não no tipo PrismaClient
-        await prisma.houseBalance.create({
-          data: {
-            gameType: "multiplicador",
-            balance: houseConfig.balance,
-            profitMargin: houseConfig.profitMargin
-          }
+        const houseBalance = await prisma.houseBalance.findFirst({
+          where: { gameType: "multiplicador" }
         });
-        console.log('Configurações iniciais da casa criadas no banco de dados.');
+        
+        if (houseBalance) {
+          houseConfig = {
+            profitMargin: houseBalance.profitMargin,
+            balance: houseBalance.balance,
+            totalBets: houseBalance.totalBets,
+            totalBetAmount: houseBalance.totalBetAmount,
+            totalPayout: houseBalance.totalPayout
+          };
+          console.log('Configurações financeiras carregadas do banco de dados:', houseConfig);
+        } else {
+          // Criar registro inicial
+          // @ts-ignore - O modelo houseBalance existe no schema mas não no tipo PrismaClient
+          await prisma.houseBalance.create({
+            data: {
+              gameType: "multiplicador",
+              balance: houseConfig.balance,
+              profitMargin: houseConfig.profitMargin
+            }
+          });
+          console.log('Configurações financeiras iniciais criadas no banco de dados.');
+        }
+      } catch (err) {
+        console.error('Erro ao carregar configurações financeiras da casa:', err);
+      }
+      
+      // Parte 2: Carregar configurações avançadas do jogo
+      try {
+        // @ts-ignore - O modelo systemConfig existe no schema mas não no tipo PrismaClient
+        const configRecord = await prisma.systemConfig.findFirst({
+          where: { key: 'multiplier_config' }
+        });
+        
+        if (configRecord) {
+          // Analisar JSON das configurações avançadas
+          try {
+            const advancedConfig = JSON.parse(configRecord.value);
+            
+            // Aplicar configurações avançadas
+            if (advancedConfig.trendStrength !== undefined) trendStrength = advancedConfig.trendStrength;
+            if (advancedConfig.volatility !== undefined) volatility = advancedConfig.volatility;
+            if (advancedConfig.crashProbability !== undefined) crashProbability = advancedConfig.crashProbability;
+            if (advancedConfig.aboveOneProbability !== undefined) aboveOneProbability = advancedConfig.aboveOneProbability;
+            if (advancedConfig.bettingPhaseDuration !== undefined) BETTING_PHASE_DURATION = advancedConfig.bettingPhaseDuration;
+            if (advancedConfig.roundDuration !== undefined) ROUND_DURATION = advancedConfig.roundDuration;
+            
+            // Garantir que profitMargin esteja sincronizada com a config da house
+            if (advancedConfig.profitMargin !== undefined && advancedConfig.profitMargin !== houseConfig.profitMargin) {
+              houseConfig.profitMargin = advancedConfig.profitMargin;
+            }
+            
+            console.log('Configurações avançadas carregadas:', {
+              trendStrength,
+              volatility,
+              crashProbability,
+              aboveOneProbability,
+              BETTING_PHASE_DURATION,
+              ROUND_DURATION
+            });
+          } catch (parseError) {
+            console.error('Erro ao analisar configurações avançadas:', parseError);
+          }
+        } else {
+          console.log('Configurações avançadas não encontradas, usando valores padrão');
+        }
+      } catch (err) {
+        console.error('Erro ao carregar configurações avançadas:', err);
       }
     } catch (error) {
-      console.error('Erro ao carregar configurações da casa:', error);
+      console.error('Erro ao carregar configurações do jogo:', error);
     }
   };
 
@@ -208,7 +261,7 @@ const MultiplierSocketHandler = async (req: NextApiRequest, res: NextApiResponse
   // Criar uma nova rodada no banco de dados
   const createRoundInDatabase = async () => {
     try {
-      // Calcular os tempos com base no tempo atual
+      // Calcular os tempos com base no tempo atual e durações configuráveis
       const now = new Date();
       const roundEndTime = new Date(now.getTime() + BETTING_PHASE_DURATION + ROUND_DURATION);
       
@@ -231,15 +284,15 @@ const MultiplierSocketHandler = async (req: NextApiRequest, res: NextApiResponse
     }
   };
 
-  // Função para determinar o resultado final baseado na margem de lucro da casa
+  // Função para determinar o resultado final com distribuição configurável
   const calculateFinalResult = () => {
     // Calcular o valor total apostado nesta rodada
     const totalBetAmount = gameState.bets.reduce((sum, bet) => sum + bet.amount, 0);
     
-    // Se não houver apostas, gerar resultado aleatório
+    // Se não houver apostas, gerar resultado aleatório com base na configuração aboveOneProbability
     if (totalBetAmount === 0) {
-      // 70% de chance de ser um multiplicador favorável (acima de 1.0)
-      return Math.random() > 0.3 ? 
+      // Usar a probabilidade configurada para valores acima de 1.0
+      return Math.random() > (1 - aboveOneProbability) ? 
         1.0 + Math.random() : // 1.0 a 2.0
         Math.random(); // 0.0 a 1.0
     }
@@ -247,15 +300,44 @@ const MultiplierSocketHandler = async (req: NextApiRequest, res: NextApiResponse
     // Ajustar o resultado para garantir a margem de lucro da casa
     const targetHouseEdge = houseConfig.profitMargin / 100; // Converter porcentagem para decimal
     
-    // Probabilidade de resultado favorável ao jogador (multiplicador >= 1.0)
-    const favorableProbability = 0.75 - targetHouseEdge; // Base 75% - margem da casa
+    // Usar aboveOneProbability como base para a probabilidade de valores acima de 1.0
+    // Subtrair a margem da casa para garantir o lucro a longo prazo
+    const favorableProbability = aboveOneProbability - targetHouseEdge;
     
-    if (Math.random() < favorableProbability) {
-      // Resultado favorável (1.0 a 2.0)
-      return 1.0 + Math.random();
+    // Garantir que a probabilidade mínima de valores altos é de 10% (ou um valor mínimo configurável)
+    const adjustedProbability = Math.max(0.1, favorableProbability);
+    
+    if (Math.random() < adjustedProbability) {
+      // Resultado acima de 1.0 (1.0 a 2.0)
+      // Concentrar mais em valores próximos de 1.0 para não dar ganhos muito altos
+      const highValue = Math.random();
+      if (highValue < 0.7) {
+        // 70% chance de valores entre 1.0 e 1.5
+        return 1.0 + (0.5 * Math.random());
+      } else if (highValue < 0.9) {
+        // 20% chance de valores entre 1.5 e 1.8
+        return 1.5 + (0.3 * Math.random());
+      } else {
+        // 10% chance de valores entre 1.8 e 2.0
+        return 1.8 + (0.2 * Math.random());
+      }
     } else {
-      // Resultado desfavorável (0.0 a 1.0)
-      return Math.random();
+      // Resultado abaixo de 1.0 (0.0 a 1.0)
+      // Distribuição mais equilibrada ao longo da faixa
+      const baseValue = Math.random();
+      if (baseValue < 0.25) {
+        // 25% chance de valores entre 0.8 e 0.99
+        return 0.8 + (0.19 * Math.random());
+      } else if (baseValue < 0.6) {
+        // 35% chance de valores entre 0.5 e 0.8
+        return 0.5 + (0.3 * Math.random());
+      } else if (baseValue < 0.85) {
+        // 25% chance de valores entre 0.3 e 0.5
+        return 0.3 + (0.2 * Math.random());
+      } else {
+        // 15% chance de valores entre 0.1 e 0.3
+        return 0.1 + (0.2 * Math.random());
+      }
     }
   };
 
@@ -264,16 +346,55 @@ const MultiplierSocketHandler = async (req: NextApiRequest, res: NextApiResponse
     // Atualizar tendência se necessário
     if (trendDuration <= 0) {
       // Gerar nova tendência
-      if (Math.random() < crashProbability && gameState.multiplier > 1.2) {
+      // Usar crashProbability da configuração para determinar chances de quebra
+      if (Math.random() < crashProbability && gameState.multiplier > 1.1) {
         // Chance de quebra (multiplicador cai drasticamente)
         trendDirection = -1;
-        trendStrength = 0.8 + Math.random() * 0.2; // 0.8 a 1.0 (forte queda)
-        trendDuration = 3 + Math.floor(Math.random() * 3); // Quebra dura pouco tempo
+        trendStrength = 0.9 + Math.random() * 0.1; // 0.9 a 1.0 (queda muito forte)
+        trendDuration = 5 + Math.floor(Math.random() * 4); // Quebra dura mais tempo (5-8 ciclos)
         console.log('QUEBRA! Multiplicador vai cair drasticamente.');
       } else {
-        // Tendência normal
-        trendDirection = Math.random() > 0.5 ? 1 : -1; // 50% chance de subir ou descer
-        if (Math.random() < 0.2) trendDirection = 0; // 20% chance de tendência neutra
+        // Tendência com viés muito forte para valores abaixo de 1.0
+        // Probabilidade extremamente baixa de aumentos quando acima de 1.0
+        // e mais alta de aumentos quando abaixo de 0.5
+        let upProbability = 0.35; // Probabilidade base de 35% (viés para queda)
+        
+        // Ajustar baseado no valor atual do multiplicador com tendências mais agressivas
+        if (gameState.multiplier > 1.7) {
+          // Se estiver muito acima de 1.0, quedas praticamente garantidas
+          upProbability = 0.05; // 95% de chance de queda
+        } else if (gameState.multiplier > 1.5) {
+          // Se estiver bem acima de 1.0, quedas quase garantidas
+          upProbability = 0.1; // 90% de chance de queda
+        } else if (gameState.multiplier > 1.3) {
+          // Se estiver acima de 1.3, quedas muito frequentes
+          upProbability = 0.15; // 85% de chance de queda
+        } else if (gameState.multiplier > 1.1) {
+          // Se estiver acima de 1.1, quedas frequentes
+          upProbability = 0.2; // 80% de chance de queda
+        } else if (gameState.multiplier > 1.0) {
+          // Se estiver pouco acima de 1.0, tendência forte a queda
+          upProbability = 0.25; // 75% de chance de queda
+        } else if (gameState.multiplier < 0.2) {
+          // Se estiver muito abaixo de 1.0, favorece subidas muito fortes
+          upProbability = 0.9; // 90% de chance de subida
+        } else if (gameState.multiplier < 0.4) {
+          // Se estiver bastante abaixo de 1.0, favorece subidas fortes
+          upProbability = 0.8; // 80% de chance de subida
+        } else if (gameState.multiplier < 0.6) {
+          // Se estiver abaixo de 0.6, favorece subidas
+          upProbability = 0.7; // 70% de chance de subida
+        } else if (gameState.multiplier < 0.8) {
+          // Se estiver abaixo de 0.8, tendência a subida moderada
+          upProbability = 0.6; // 60% de chance de subida
+        } else if (gameState.multiplier < 1.0) {
+          // Se estiver próximo de 1.0 mas abaixo, tendência leve a subida
+          upProbability = 0.55; // 55% de chance de subida
+        }
+        
+        // Define a direção da tendência com base na probabilidade ajustada
+        trendDirection = Math.random() < upProbability ? 1 : -1;
+        if (Math.random() < 0.15) trendDirection = 0; // 15% chance de tendência neutra
         
         // Força da tendência (maior valor = movimento mais forte na direção da tendência)
         trendStrength = 0.3 + Math.random() * 0.7; // Entre 0.3 e 1.0
@@ -304,17 +425,41 @@ const MultiplierSocketHandler = async (req: NextApiRequest, res: NextApiResponse
     
     // Adicionar lógica para garantir que o multiplicador termine próximo ao valor calculado
     const elapsedTimePercentage = (Date.now() - gameState.startTime) / ROUND_DURATION;
-    if (elapsedTimePercentage > 0.7) { // Nos últimos 30% do tempo
+    
+    // Começar a direcionar o resultado mais cedo e com ajuste mais forte
+    if (elapsedTimePercentage > 0.5) { // Nos últimos 50% do tempo
       // Calcular o resultado final se ainda não foi determinado
       if (!gameState.targetEndValue) {
-        gameState.targetEndValue = calculateFinalResult();
+        // Forçar resultado final com probabilidade ainda mais baixa de valores acima de 1.0
+        let finalResult;
+        if (Math.random() < 0.2) { // Apenas 20% de chance para valores acima de 1.0
+          // Resultado acima de 1.0, concentrado em valores mais baixos
+          finalResult = 1.0 + (Math.random() * 0.8); // Entre 1.0 e 1.8
+        } else {
+          // 80% de chance para valores abaixo de 1.0
+          finalResult = 0.1 + (Math.random() * 0.9); // Entre 0.1 e 1.0
+        }
+        gameState.targetEndValue = finalResult;
         console.log(`Definido valor final alvo: ${gameState.targetEndValue}`);
       }
       
-      // Ajustar suavemente em direção ao valor final
+      // Ajustar mais agressivamente em direção ao valor final
       const targetEndValue = gameState.targetEndValue;
-      const remainingTimePercent = (1 - elapsedTimePercentage) * 3.33; // Fator de ajuste (0.3 -> 1, 1 -> 0)
-      gameState.multiplier = gameState.multiplier + ((targetEndValue - gameState.multiplier) * 0.1 * (1 - remainingTimePercent));
+      const remainingTimePercent = (1 - elapsedTimePercentage) * 2.0; // Fator de ajuste mais agressivo
+      
+      // Quanto mais perto do final, mais forte o ajuste (aumentando de 15% para 30%)
+      const adjustmentFactor = 0.15 + (0.15 * (1 - remainingTimePercent));
+      
+      // Ajuste mais forte para valores acima de 1.0 que precisam diminuir
+      const directionFactor = (targetEndValue < gameState.multiplier && gameState.multiplier > 1.0) ? 2.0 : 1.0;
+      
+      gameState.multiplier = gameState.multiplier + 
+        ((targetEndValue - gameState.multiplier) * adjustmentFactor * directionFactor);
+      
+      // Log para debug
+      if (elapsedTimePercentage > 0.9) {
+        console.log(`Ajustando para valor final: atual=${gameState.multiplier.toFixed(2)}, alvo=${targetEndValue.toFixed(2)}`);
+      }
     }
     
     return gameState.multiplier;
@@ -334,9 +479,9 @@ const MultiplierSocketHandler = async (req: NextApiRequest, res: NextApiResponse
       gameState.multiplier = INITIAL_MULTIPLIER; // Resetar multiplicador
       gameState.bets = []; // Limpar apostas anteriores
       gameState.cashOuts = []; // Limpar cash-outs anteriores
-      gameState.timeLeft = BETTING_PHASE_DURATION;
+      gameState.timeLeft = BETTING_PHASE_DURATION; // Usar duração configurável
       gameState.startTime = Date.now();
-      gameState.endTime = Date.now() + BETTING_PHASE_DURATION;
+      gameState.endTime = Date.now() + BETTING_PHASE_DURATION; // Usar duração configurável
       
       // Parar intervalo anterior se existir
       if (roundInterval) {
@@ -371,9 +516,9 @@ const MultiplierSocketHandler = async (req: NextApiRequest, res: NextApiResponse
       
       // Atualizar o estado do jogo
       gameState.phase = 'running';
-      gameState.timeLeft = ROUND_DURATION;
+      gameState.timeLeft = ROUND_DURATION; // Usar duração configurável
       gameState.startTime = Date.now();
-      gameState.endTime = Date.now() + ROUND_DURATION;
+      gameState.endTime = Date.now() + ROUND_DURATION; // Usar duração configurável
       
       // Atualizar o status da rodada no banco de dados
       // @ts-ignore - O modelo gameRound existe no schema mas não no tipo PrismaClient
@@ -677,8 +822,8 @@ const MultiplierSocketHandler = async (req: NextApiRequest, res: NextApiResponse
     if (cleanupInterval) clearInterval(cleanupInterval);
   });
 
-  // Carregar configurações da casa
-  await loadHouseConfig();
+  // Carregar todas as configurações do jogo
+  await loadGameConfig();
 
   // Iniciar o jogo com uma nova rodada apenas na primeira inicialização
   if (isFirstInitialization) {
