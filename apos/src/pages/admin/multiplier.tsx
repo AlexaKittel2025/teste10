@@ -46,10 +46,10 @@ export default function MultiplierAdmin() {
     minMultiplier: 0.0,
     bettingPhaseDuration: 5000,
     roundDuration: 20000,
-    aboveOneProbability: 0.3,
-    volatility: 0.75,
-    crashProbability: 0.25,
-    trendStrength: 0.7,
+    aboveOneProbability: 0.45,
+    volatility: 0.7,
+    crashProbability: 0.15,
+    trendStrength: 0.6,
     balance: 100000
   });
   
@@ -647,19 +647,19 @@ export default function MultiplierAdmin() {
                 <div className="space-y-3 text-sm text-gray-300">
                   <p className="flex items-center">
                     <span className="w-3 h-3 bg-blue-500 rounded-full mr-2"></span>
-                    <strong>Equilibrado (Padrão):</strong> Margem 5%, Prob. >1.0: 30%
+                    <strong>Equilibrado (Padrão):</strong> Margem 5%, Prob. >1.0: 45%
                   </p>
                   <p className="flex items-center">
                     <span className="w-3 h-3 bg-green-500 rounded-full mr-2"></span>
-                    <strong>Amigável:</strong> Margem 3%, Prob. >1.0: 40%
+                    <strong>Amigável:</strong> Margem 3%, Prob. >1.0: 55%
                   </p>
                   <p className="flex items-center">
                     <span className="w-3 h-3 bg-yellow-500 rounded-full mr-2"></span>
-                    <strong>Lucrativo:</strong> Margem 7%, Prob. >1.0: 25%
+                    <strong>Lucrativo:</strong> Margem 7%, Prob. >1.0: 35%
                   </p>
                   <p className="flex items-center">
                     <span className="w-3 h-3 bg-red-500 rounded-full mr-2"></span>
-                    <strong>Altamente Lucrativo:</strong> Margem 10%, Prob. >1.0: 20%
+                    <strong>Desafiador:</strong> Margem 10%, Prob. >1.0: 25%
                   </p>
                 </div>
                 
@@ -669,10 +669,10 @@ export default function MultiplierAdmin() {
                       setConfig(prev => ({
                         ...prev,
                         profitMargin: 5,
-                        aboveOneProbability: 0.3,
-                        volatility: 0.75,
-                        crashProbability: 0.25,
-                        trendStrength: 0.7
+                        aboveOneProbability: 0.45,
+                        volatility: 0.7,
+                        crashProbability: 0.15,
+                        trendStrength: 0.6
                       }));
                     }}
                     className="px-2 py-1 bg-blue-900 bg-opacity-50 hover:bg-opacity-70 rounded text-xs border border-blue-700"
@@ -684,10 +684,10 @@ export default function MultiplierAdmin() {
                       setConfig(prev => ({
                         ...prev,
                         profitMargin: 3,
-                        aboveOneProbability: 0.4,
-                        volatility: 0.6,
-                        crashProbability: 0.2,
-                        trendStrength: 0.6
+                        aboveOneProbability: 0.55,
+                        volatility: 0.5,
+                        crashProbability: 0.1,
+                        trendStrength: 0.5
                       }));
                     }}
                     className="px-2 py-1 bg-green-900 bg-opacity-50 hover:bg-opacity-70 rounded text-xs border border-green-700"
@@ -699,10 +699,10 @@ export default function MultiplierAdmin() {
                       setConfig(prev => ({
                         ...prev,
                         profitMargin: 7,
-                        aboveOneProbability: 0.25,
+                        aboveOneProbability: 0.35,
                         volatility: 0.8,
-                        crashProbability: 0.3,
-                        trendStrength: 0.75
+                        crashProbability: 0.2,
+                        trendStrength: 0.7
                       }));
                     }}
                     className="px-2 py-1 bg-yellow-900 bg-opacity-50 hover:bg-opacity-70 rounded text-xs border border-yellow-700"
@@ -714,15 +714,15 @@ export default function MultiplierAdmin() {
                       setConfig(prev => ({
                         ...prev,
                         profitMargin: 10,
-                        aboveOneProbability: 0.2,
-                        volatility: 0.85,
-                        crashProbability: 0.35,
+                        aboveOneProbability: 0.25,
+                        volatility: 0.9,
+                        crashProbability: 0.25,
                         trendStrength: 0.8
                       }));
                     }}
                     className="px-2 py-1 bg-red-900 bg-opacity-50 hover:bg-opacity-70 rounded text-xs border border-red-700"
                   >
-                    Altamente Lucrativo
+                    Desafiador
                   </button>
                 </div>
               </div>

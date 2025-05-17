@@ -7,11 +7,19 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  const session = await getServerSession(req, res, authOptions);
+  console.log(`[${new Date().toISOString()}] Transactions API called - Method: ${req.method}`);
+  
+  // Set timeout for API response
+  res.setHeader('Connection', 'keep-alive');
+  
+  try {
+    const session = await getServerSession(req, res, authOptions);
 
   console.log('Sessão do usuário:', session ? 'Autenticado' : 'Não autenticado');
+  console.log('Session data:', JSON.stringify(session, null, 2));
 
   if (!session) {
+    console.error('No session found - returning 401');
     return res.status(401).json({ message: 'Não autorizado. Faça login primeiro.' });
   }
 
@@ -117,16 +125,46 @@ export default async function handler(
 
   if (req.method === 'GET') {
     try {
+      console.log(`Fetching transactions for user: ${session.user.id}`);
+      
       // Parâmetro opcional: limitar o número de transações retornadas
       const limit = req.query.limit ? parseInt(req.query.limit as string) : 10;
       
-      // Buscar transações recentes do usuário
+      // Testar a conexão com o banco de dados
+      const userExists = await prisma.user.findUnique({
+        where: { id: session.user.id }
+      });
+      
+      if (!userExists) {
+        console.error(`User not found in database: ${session.user.id}`);
+        return res.status(404).json({ message: 'Usuário não encontrado' });
+      }
+      
+      console.log(`User found in database: ${userExists.email}`);
+      
+      // Buscar transações recentes do usuário, excluindo campos problemáticos
       const transactions = await prisma.transaction.findMany({
         where: {
           userId: session.user.id,
           type: {
             in: ['DEPOSIT', 'WITHDRAWAL'] // Retornar apenas depósitos e saques, não apostas
           }
+        },
+        select: {
+          id: true,
+          userId: true,
+          amount: true,
+          type: true,
+          status: true,
+          details: true,
+          createdAt: true,
+          updatedAt: true,
+          // Não incluir campos que podem não existir no banco
+          // pixCode: false,
+          // pixExpiration: false,
+          // externalId: false,
+          // paymentUrl: false,
+          // qrCodeImage: false
         },
         orderBy: {
           createdAt: 'desc'
@@ -136,12 +174,26 @@ export default async function handler(
       
       console.log(`Retornando ${transactions.length} transações para o usuário ${session.user.id}`);
       
+      // Log de sucesso antes de enviar
+      console.log('Enviando resposta com sucesso. Array de transações tem tamanho:', transactions.length);
+      console.log('Primeira transação:', transactions[0] || 'Nenhuma transação');
+      
       return res.status(200).json(transactions);
     } catch (error) {
-      console.error('Erro ao buscar transações:', error);
-      return res.status(500).json({ error: 'Erro ao processar a requisição' });
+      console.error('Erro detalhado ao buscar transações:', error);
+      console.error('Stack trace:', (error as Error).stack);
+      console.error('Nome do erro:', (error as Error).name);
+      
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+      console.error('Enviando resposta de erro:', { message: errorMessage });
+      
+      return res.status(500).json({ message: `Erro ao processar a requisição: ${errorMessage}` });
     }
   }
 
   return res.status(405).json({ error: 'Método não permitido' });
+  } catch (globalError) {
+    console.error('Erro global não capturado:', globalError);
+    return res.status(500).json({ message: 'Erro interno do servidor' });
+  }
 } 

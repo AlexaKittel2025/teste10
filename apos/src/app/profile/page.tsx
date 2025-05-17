@@ -297,23 +297,36 @@ export default function ProfilePage() {
       // Resetar para a primeira página sempre que buscar novas transações
       setCurrentPage(1);
       
-      const response = await fetch('/api/transactions');
+      const response = await fetch('/api/transactions', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+      });
       
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ message: 'Erro ao processar resposta do servidor' }));
-        console.error('Erro ao carregar transações:', errorData.message);
-        setErrorMessage(errorData.message || 'Erro ao carregar transações');
-        setTimeout(() => setErrorMessage(''), 5000);
+        console.error('Erro ao carregar transações:', response.status, errorData);
+        console.error('URL completa:', `/api/transactions`);
+        console.error('Detalhes do erro:', errorData);
+        setErrorMessage(errorData.message || `Erro ao carregar transações (${response.status})`);
+        setTimeout(() => setErrorMessage(''), 8000);
         return;
       }
       
-      const data = await response.json();
+      const data = await response.json().catch(() => {
+        console.error('Erro ao parsear JSON da resposta');
+        return [];
+      });
       
       // Validar se a resposta é um array
       if (!Array.isArray(data)) {
         console.error('Resposta inválida - esperado um array de transações:', data);
         setErrorMessage('Formato de dados inválido recebido do servidor');
         setTimeout(() => setErrorMessage(''), 5000);
+        // Usar array vazio como fallback
+        setTransactions([]);
         return;
       }
       
@@ -339,8 +352,20 @@ export default function ProfilePage() {
       await refreshBalance();
     } catch (error) {
       console.error('Erro ao buscar transações:', error);
-      setErrorMessage('Erro ao carregar transações. Por favor, tente novamente.');
-      setTimeout(() => setErrorMessage(''), 5000);
+      console.error('Tipo de erro:', error instanceof Error ? error.constructor.name : typeof error);
+      console.error('Mensagem de erro:', error instanceof Error ? error.message : String(error));
+      
+      // Se for erro de rede ou timeout, tentar novamente depois de um tempo
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        setErrorMessage('Erro de conexão. Tentando novamente em 3 segundos...');
+        setTimeout(() => {
+          fetchTransactions();
+        }, 3000);
+      } else {
+        setErrorMessage('Erro ao carregar transações. Por favor, recarregue a página.');
+      }
+      
+      setTimeout(() => setErrorMessage(''), 8000);
     } finally {
       setLoadingTransactions(false);
     }

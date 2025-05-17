@@ -50,13 +50,19 @@ interface GameState {
 }
 
 // Constantes do jogo - estáticas, não mudam em tempo real
-const INITIAL_MULTIPLIER = 1.0; // Multiplicador inicial
+const INITIAL_MULTIPLIER = 1.0; // Multiplicador inicial padrão
 const MAX_MULTIPLIER = 2.0; // Multiplicador máximo
 const MIN_MULTIPLIER = 0.0; // Multiplicador mínimo
 
 // Configurações de duração - precisam ser declaradas antes de usar
 const BETTING_PHASE_DURATION_DEFAULT = 5000; // 5 segundos para apostas (padrão)
 const ROUND_DURATION_DEFAULT = 20000; // 20 segundos para a rodada em execução (padrão)
+
+// Função para gerar multiplicador inicial variável
+const getRandomInitialMultiplier = () => {
+  // Multiplicador inicial pode variar entre 0.7 e 1.3
+  return 0.7 + (Math.random() * 0.6);
+};
 
 // Estado do jogo
 let gameState: GameState = {
@@ -120,13 +126,30 @@ const MultiplierSocketHandler = async (req: NextApiRequest, res: NextApiResponse
   let activeConnections = 0;
   let isFirstInitialization = !gameState.roundId;
 
-  // Variáveis para controlar a evolução do multiplicador - valores iniciais que podem ser sobrescritos pela configuração
+  // Configuração padrão do jogo - valores mais variados
+  const defaultConfig = {
+    profitMargin: 5,
+    initialMultiplier: 1.0,
+    maxMultiplier: 2.0,
+    minMultiplier: 0.0,
+    trendStrength: 0.6,
+    volatility: 0.7,
+    crashProbability: 0.15,
+    aboveOneProbability: 0.45,
+    bettingPhaseDuration: 5000,
+    roundDuration: 20000
+  };
+
+  // Configuração atual do jogo (pode ser sobrescrita pelo banco de dados)
+  let gameConfig = { ...defaultConfig };
+
+  // Variáveis para controlar a evolução do multiplicador - valores iniciais mais variados
   let trendDirection = 0; // -1 (diminuindo), 0 (neutro), 1 (aumentando)
-  let trendStrength = 0.7; // Força da tendência atual (0 a 1) - Aumentada para 0.7
+  let trendStrength = 0.5 + (Math.random() * 0.5); // Força da tendência inicial aleatória (0.5 a 1.0)
   let trendDuration = 0; // Duração restante da tendência atual
-  let volatility = 0.75; // Volatilidade atual (0 a 1) - Aumentada para 0.75
-  let crashProbability = 0.25; // Probabilidade de "quebra" (multiplicador cair drasticamente) - Aumentada para 25%
-  let aboveOneProbability = 0.3; // Probabilidade de resultado acima de 1.0 (0-1)
+  let volatility = 0.3 + (Math.random() * 0.7); // Volatilidade inicial aleatória (0.3 a 1.0)
+  let crashProbability = 0.1 + (Math.random() * 0.2); // Probabilidade de "quebra" aleatória (10% a 30%)
+  let aboveOneProbability = 0.35 + (Math.random() * 0.3); // Probabilidade de resultado acima de 1.0 (35% a 65%)
   
   // Configurações de duração - valores que podem ser sobrescritos pela configuração do banco
   let BETTING_PHASE_DURATION = BETTING_PHASE_DURATION_DEFAULT; // Usar valor padrão inicialmente
@@ -179,7 +202,10 @@ const MultiplierSocketHandler = async (req: NextApiRequest, res: NextApiResponse
           try {
             const advancedConfig = JSON.parse(configRecord.value);
             
-            // Aplicar configurações avançadas
+            // Aplicar configurações avançadas ao gameConfig
+            gameConfig = { ...gameConfig, ...advancedConfig };
+            
+            // Aplicar às variáveis individuais
             if (advancedConfig.trendStrength !== undefined) trendStrength = advancedConfig.trendStrength;
             if (advancedConfig.volatility !== undefined) volatility = advancedConfig.volatility;
             if (advancedConfig.crashProbability !== undefined) crashProbability = advancedConfig.crashProbability;
@@ -284,59 +310,65 @@ const MultiplierSocketHandler = async (req: NextApiRequest, res: NextApiResponse
     }
   };
 
-  // Função para determinar o resultado final com distribuição configurável
+  // Função para determinar o resultado final com distribuição mais variada
   const calculateFinalResult = () => {
     // Calcular o valor total apostado nesta rodada
     const totalBetAmount = gameState.bets.reduce((sum, bet) => sum + bet.amount, 0);
     
-    // Se não houver apostas, gerar resultado aleatório com base na configuração aboveOneProbability
+    // Se não houver apostas, gerar resultado aleatório variado
     if (totalBetAmount === 0) {
-      // Usar a probabilidade configurada para valores acima de 1.0
-      return Math.random() > (1 - aboveOneProbability) ? 
-        1.0 + Math.random() : // 1.0 a 2.0
-        Math.random(); // 0.0 a 1.0
+      return Math.random() * 2; // Qualquer valor entre 0.0 e 2.0
     }
     
-    // Ajustar o resultado para garantir a margem de lucro da casa
-    const targetHouseEdge = houseConfig.profitMargin / 100; // Converter porcentagem para decimal
+    // Carregar configurações atuais
+    const config = gameConfig || defaultConfig;
+    const targetHouseEdge = config.profitMargin / 100;
+    const baseProbability = config.aboveOneProbability / 100;
     
-    // Usar aboveOneProbability como base para a probabilidade de valores acima de 1.0
-    // Subtrair a margem da casa para garantir o lucro a longo prazo
-    const favorableProbability = aboveOneProbability - targetHouseEdge;
+    // Adicionar variação aleatória para cada rodada
+    const randomVariation = (Math.random() - 0.5) * 0.3; // ±15% de variação
+    const adjustedProbability = Math.max(0.2, Math.min(0.8, baseProbability + randomVariation - targetHouseEdge));
     
-    // Garantir que a probabilidade mínima de valores altos é de 10% (ou um valor mínimo configurável)
-    const adjustedProbability = Math.max(0.1, favorableProbability);
+    // Determinar categoria de multiplicador
+    const roll = Math.random();
     
-    if (Math.random() < adjustedProbability) {
-      // Resultado acima de 1.0 (1.0 a 2.0)
-      // Concentrar mais em valores próximos de 1.0 para não dar ganhos muito altos
+    if (roll < adjustedProbability) {
+      // Resultado acima de 1.0 - Distribuição mais ampla
       const highValue = Math.random();
-      if (highValue < 0.7) {
-        // 70% chance de valores entre 1.0 e 1.5
-        return 1.0 + (0.5 * Math.random());
-      } else if (highValue < 0.9) {
-        // 20% chance de valores entre 1.5 e 1.8
-        return 1.5 + (0.3 * Math.random());
+      if (highValue < 0.05) {
+        // 5% chance de multiplicador especial alto (1.9 a 2.0)
+        return 1.9 + (0.1 * Math.random());
+      } else if (highValue < 0.15) {
+        // 10% chance de valores muito altos (1.7 a 1.9)
+        return 1.7 + (0.2 * Math.random());
+      } else if (highValue < 0.35) {
+        // 20% chance de valores altos (1.4 a 1.7)
+        return 1.4 + (0.3 * Math.random());
+      } else if (highValue < 0.65) {
+        // 30% chance de valores médios (1.2 a 1.4)
+        return 1.2 + (0.2 * Math.random());
       } else {
-        // 10% chance de valores entre 1.8 e 2.0
-        return 1.8 + (0.2 * Math.random());
+        // 35% chance de valores baixos (1.0 a 1.2)
+        return 1.0 + (0.2 * Math.random());
       }
     } else {
-      // Resultado abaixo de 1.0 (0.0 a 1.0)
-      // Distribuição mais equilibrada ao longo da faixa
-      const baseValue = Math.random();
-      if (baseValue < 0.25) {
-        // 25% chance de valores entre 0.8 e 0.99
-        return 0.8 + (0.19 * Math.random());
-      } else if (baseValue < 0.6) {
-        // 35% chance de valores entre 0.5 e 0.8
-        return 0.5 + (0.3 * Math.random());
-      } else if (baseValue < 0.85) {
-        // 25% chance de valores entre 0.3 e 0.5
-        return 0.3 + (0.2 * Math.random());
-      } else {
-        // 15% chance de valores entre 0.1 e 0.3
+      // Resultado abaixo de 1.0 - Distribuição mais variada
+      const lowValue = Math.random();
+      if (lowValue < 0.05) {
+        // 5% chance de valores muito baixos (0.01 a 0.1)
+        return 0.01 + (0.09 * Math.random());
+      } else if (lowValue < 0.15) {
+        // 10% chance de valores baixos (0.1 a 0.3)
         return 0.1 + (0.2 * Math.random());
+      } else if (lowValue < 0.35) {
+        // 20% chance de valores médios-baixos (0.3 a 0.6)
+        return 0.3 + (0.3 * Math.random());
+      } else if (lowValue < 0.65) {
+        // 30% chance de valores médios (0.6 a 0.8)
+        return 0.6 + (0.2 * Math.random());
+      } else {
+        // 35% chance de valores altos (0.8 a 0.95)
+        return 0.8 + (0.15 * Math.random());
       }
     }
   };
@@ -354,67 +386,54 @@ const MultiplierSocketHandler = async (req: NextApiRequest, res: NextApiResponse
         trendDuration = 5 + Math.floor(Math.random() * 4); // Quebra dura mais tempo (5-8 ciclos)
         console.log('QUEBRA! Multiplicador vai cair drasticamente.');
       } else {
-        // Tendência com viés muito forte para valores abaixo de 1.0
-        // Probabilidade extremamente baixa de aumentos quando acima de 1.0
-        // e mais alta de aumentos quando abaixo de 0.5
-        let upProbability = 0.35; // Probabilidade base de 35% (viés para queda)
+        // Tendências mais aleatórias e dinâmicas
+        const randomFactor = Math.random();
+        let upProbability = 0.5; // Probabilidade base equilibrada
         
-        // Ajustar baseado no valor atual do multiplicador com tendências mais agressivas
-        if (gameState.multiplier > 1.7) {
-          // Se estiver muito acima de 1.0, quedas praticamente garantidas
-          upProbability = 0.05; // 95% de chance de queda
-        } else if (gameState.multiplier > 1.5) {
-          // Se estiver bem acima de 1.0, quedas quase garantidas
-          upProbability = 0.1; // 90% de chance de queda
-        } else if (gameState.multiplier > 1.3) {
-          // Se estiver acima de 1.3, quedas muito frequentes
-          upProbability = 0.15; // 85% de chance de queda
-        } else if (gameState.multiplier > 1.1) {
-          // Se estiver acima de 1.1, quedas frequentes
-          upProbability = 0.2; // 80% de chance de queda
+        // Adicionar variação aleatória geral
+        upProbability += (Math.random() - 0.5) * 0.3; // ±15% de variação
+        
+        // Ajustes baseados no multiplicador atual (menos previsíveis)
+        if (gameState.multiplier > 1.8) {
+          upProbability *= 0.3 + (randomFactor * 0.4); // Mais chance de cair, mas com variação
+        } else if (gameState.multiplier > 1.4) {
+          upProbability *= 0.4 + (randomFactor * 0.3); 
         } else if (gameState.multiplier > 1.0) {
-          // Se estiver pouco acima de 1.0, tendência forte a queda
-          upProbability = 0.25; // 75% de chance de queda
+          upProbability *= 0.5 + (randomFactor * 0.3); // Médio quando acima de 1.0
         } else if (gameState.multiplier < 0.2) {
-          // Se estiver muito abaixo de 1.0, favorece subidas muito fortes
-          upProbability = 0.9; // 90% de chance de subida
-        } else if (gameState.multiplier < 0.4) {
-          // Se estiver bastante abaixo de 1.0, favorece subidas fortes
-          upProbability = 0.8; // 80% de chance de subida
-        } else if (gameState.multiplier < 0.6) {
-          // Se estiver abaixo de 0.6, favorece subidas
-          upProbability = 0.7; // 70% de chance de subida
-        } else if (gameState.multiplier < 0.8) {
-          // Se estiver abaixo de 0.8, tendência a subida moderada
-          upProbability = 0.6; // 60% de chance de subida
-        } else if (gameState.multiplier < 1.0) {
-          // Se estiver próximo de 1.0 mas abaixo, tendência leve a subida
-          upProbability = 0.55; // 55% de chance de subida
+          upProbability *= 1.4 + (randomFactor * 0.4); // Tende a subir de valores muito baixos
+        } else if (gameState.multiplier < 0.5) {
+          upProbability *= 1.2 + (randomFactor * 0.3);
+        } else {
+          upProbability *= 0.8 + (randomFactor * 0.4); // Variação média
         }
+        
+        // Garantir que upProbability fique entre 0.1 e 0.9
+        upProbability = Math.max(0.1, Math.min(0.9, upProbability));
         
         // Define a direção da tendência com base na probabilidade ajustada
         trendDirection = Math.random() < upProbability ? 1 : -1;
-        if (Math.random() < 0.15) trendDirection = 0; // 15% chance de tendência neutra
+        if (Math.random() < 0.25) trendDirection = 0; // 25% chance de tendência neutra (mais momentos de estabilidade)
         
-        // Força da tendência (maior valor = movimento mais forte na direção da tendência)
-        trendStrength = 0.3 + Math.random() * 0.7; // Entre 0.3 e 1.0
+        // Força da tendência mais variada
+        trendStrength = 0.1 + Math.random() * 0.9; // Entre 0.1 e 1.0 (mais amplitude)
         
-        // Duração da tendência (em número de atualizações)
-        trendDuration = 5 + Math.floor(Math.random() * 10); // Entre 5 e 14 atualizações
+        // Duração da tendência mais variável
+        trendDuration = 3 + Math.floor(Math.random() * 15); // Entre 3 e 17 atualizações
       }
       
-      // Volatilidade (maior valor = movimentos mais bruscos)
-      volatility = 0.2 + Math.random() * 0.8; // Entre 0.2 e 1.0
+      // Volatilidade com mais variação
+      volatility = 0.1 + Math.random() * 0.9; // Entre 0.1 e 1.0 (pode ser bem calmo ou muito volátil)
     }
     
     // Reduzir duração da tendência
     trendDuration--;
     
-    // Calcular componente de tendência
-    const trendComponent = trendDirection * trendStrength * 0.05; // Escala para ter efeito perceptível
+    // Calcular componente de tendência com escala maior para mais variação
+    const trendComponent = trendDirection * trendStrength * 0.08; // Aumentado de 0.05 para 0.08
     
-    // Calcular componente aleatório (ruído)
-    const randomRange = 0.03 * volatility; // Maior volatilidade = maior range de variação aleatória
+    // Calcular componente aleatório com mais amplitude
+    const randomRange = 0.05 * volatility; // Aumentado de 0.03 para 0.05
     const noiseComponent = (Math.random() * randomRange * 2) - randomRange;
     
     // Movimento total
@@ -430,16 +449,8 @@ const MultiplierSocketHandler = async (req: NextApiRequest, res: NextApiResponse
     if (elapsedTimePercentage > 0.5) { // Nos últimos 50% do tempo
       // Calcular o resultado final se ainda não foi determinado
       if (!gameState.targetEndValue) {
-        // Forçar resultado final com probabilidade ainda mais baixa de valores acima de 1.0
-        let finalResult;
-        if (Math.random() < 0.2) { // Apenas 20% de chance para valores acima de 1.0
-          // Resultado acima de 1.0, concentrado em valores mais baixos
-          finalResult = 1.0 + (Math.random() * 0.8); // Entre 1.0 e 1.8
-        } else {
-          // 80% de chance para valores abaixo de 1.0
-          finalResult = 0.1 + (Math.random() * 0.9); // Entre 0.1 e 1.0
-        }
-        gameState.targetEndValue = finalResult;
+        // Usar a função calculateFinalResult para maior consistência e variedade
+        gameState.targetEndValue = calculateFinalResult();
         console.log(`Definido valor final alvo: ${gameState.targetEndValue}`);
       }
       
@@ -476,7 +487,7 @@ const MultiplierSocketHandler = async (req: NextApiRequest, res: NextApiResponse
       // Atualizar o estado do jogo
       gameState.phase = 'betting';
       gameState.roundId = round.id;
-      gameState.multiplier = INITIAL_MULTIPLIER; // Resetar multiplicador
+      gameState.multiplier = INITIAL_MULTIPLIER; // Durante apostas, volta ao padrão
       gameState.bets = []; // Limpar apostas anteriores
       gameState.cashOuts = []; // Limpar cash-outs anteriores
       gameState.timeLeft = BETTING_PHASE_DURATION; // Usar duração configurável
@@ -519,6 +530,8 @@ const MultiplierSocketHandler = async (req: NextApiRequest, res: NextApiResponse
       gameState.timeLeft = ROUND_DURATION; // Usar duração configurável
       gameState.startTime = Date.now();
       gameState.endTime = Date.now() + ROUND_DURATION; // Usar duração configurável
+      gameState.multiplier = getRandomInitialMultiplier(); // Começar com valor variável
+      gameState.targetEndValue = null; // Resetar valor final
       
       // Atualizar o status da rodada no banco de dados
       // @ts-ignore - O modelo gameRound existe no schema mas não no tipo PrismaClient

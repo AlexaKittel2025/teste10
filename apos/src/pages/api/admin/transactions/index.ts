@@ -31,12 +31,20 @@ export default async function handler(
       return res.status(400).json({ message: 'Tipo de transação inválido. Use DEPOSIT ou WITHDRAWAL' });
     }
 
-    // Buscar transações pelo tipo
+    // Buscar transações pelo tipo, excluindo campos problemáticos
     const transactions = await prisma.transaction.findMany({
       where: {
         type: type as string
       },
-      include: {
+      select: {
+        id: true,
+        userId: true,
+        amount: true,
+        type: true,
+        status: true,
+        details: true,
+        createdAt: true,
+        updatedAt: true,
         user: {
           select: {
             id: true,
