@@ -3,7 +3,8 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]';
 import { prisma } from '@/lib/prisma';
 import { updateUserBalance } from '@/lib/user-utils';
-import { addBetRewards } from '@/lib/levelSystem';
+import { addBetRewards, getUserBonusMultiplier } from '@/lib/levelSystem';
+import { applyLevelBonusToMultiplier } from '@/lib/gameRewardsIntegration';
 import { 
   MAX_POSSIBLE_MULTIPLIER, 
   MIN_POSSIBLE_MULTIPLIER,
@@ -165,9 +166,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       console.error('Erro ao verificar cash-out existente:', error);
     }
     
-    // Calcular o valor a ser recebido
-    const winAmount = bet.amount * multiplier;
-    console.log(`Calculando ganho: ${bet.amount} x ${multiplier} = ${winAmount}`);
+    // Buscar o multiplicador de bônus do nível do usuário
+    let levelBonusMultiplier = 0;
+    try {
+      levelBonusMultiplier = await getUserBonusMultiplier(session.user.id);
+      console.log(`Multiplicador de bônus do nível: +${(levelBonusMultiplier * 100).toFixed(1)}%`);
+    } catch (error) {
+      console.error('Erro ao buscar multiplicador de bônus do nível:', error);
+      // Continuar sem bônus em caso de erro
+    }
+    
+    // Aplicar o bônus do nível ao multiplicador
+    const finalMultiplier = applyLevelBonusToMultiplier(multiplier, levelBonusMultiplier);
+    console.log(`Multiplicador final com bônus: ${multiplier} → ${finalMultiplier}`);
+    
+    // Calcular o valor a ser recebido com o multiplicador final
+    const winAmount = bet.amount * finalMultiplier;
+    console.log(`Calculando ganho: ${bet.amount} x ${finalMultiplier} = ${winAmount}`);
     
     let updatedBet, newBalance, cashout, levelRewards;
     
@@ -180,7 +195,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           where: { id: bet.id },
           data: {
             status: 'COMPLETED',
-            result: multiplier,
+            result: finalMultiplier, // Usar o multiplicador final com bônus
             winAmount: winAmount,
             completedAt: new Date()
           },
@@ -235,7 +250,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               gameType: 'multiplicador',
               roundId: roundId,
               betId: bet.id,
-              multiplier: multiplier,
+              multiplier: finalMultiplier, // Usar o multiplicador final com bônus
               balanceAfter: newBalanceTx
             })
           },
@@ -259,7 +274,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             userId: session.user.id,
             betId: bet.id,
             roundId: roundId,
-            multiplier: multiplier,
+            multiplier: finalMultiplier, // Usar o multiplicador final com bônus
             amount: winAmount,
           },
         });
@@ -310,6 +325,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       cashout: cashout,
       newBalance: newBalance,
       winAmount: winAmount,
+      originalMultiplier: multiplier,
+      finalMultiplier: finalMultiplier,
+      bonusMultiplier: levelBonusMultiplier,
       level: levelRewards ? {
         addedXP: levelRewards.addedXP,
         addedPoints: levelRewards.addedPoints,

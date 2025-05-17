@@ -95,6 +95,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
   } catch (error) {
     console.error('Erro ao resgatar recompensa:', error);
-    return res.status(500).json({ error: 'Erro ao processar o resgate da recompensa' });
+    
+    // Tratar erros específicos do Prisma
+    let errorMessage = 'Erro ao processar o resgate da recompensa';
+    
+    if (error instanceof Error) {
+      console.error('Detalhes do erro:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
+      
+      if (error.message.includes('loyaltyPoints')) {
+        errorMessage = 'Pontos de fidelidade insuficientes';
+      } else if (error.message.includes('does not exist')) {
+        console.error('Erro de estrutura do banco:', error.message);
+        errorMessage = 'Erro temporário ao processar resgate. Por favor, tente novamente.';
+      } else if (error.message.includes('foreign key')) {
+        errorMessage = 'Erro de integridade no banco de dados';
+      }
+    }
+    
+    return res.status(500).json({ error: errorMessage });
   }
 } 

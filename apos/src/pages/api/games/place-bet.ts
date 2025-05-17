@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]';
 import { prisma } from '@/lib/prisma';
 import { updateUserBalance } from '@/lib/user-utils';
+import { addBetRewards } from '@/lib/levelSystem';
 import { 
   MIN_BET_AMOUNT, 
   MAX_BET_AMOUNT, 
@@ -236,7 +237,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     
     // Usar transação para garantir consistência entre aposta e atualização de saldo
     console.log('Registrando aposta e atualizando saldo usando transação');
-    let bet, newBalance;
+    let bet, newBalance, levelRewards;
     try {
       // Executar todas as operações em uma única transação
       const result = await prisma.$transaction(async (tx) => {
@@ -316,18 +317,42 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       newBalance = result.newBalance;
       
       console.log('Transação concluída com sucesso');
+      
+      // Adicionar recompensas de nível pela aposta feita
+      try {
+        console.log('Adicionando recompensas de nível pela aposta...');
+        // Para apostas, passamos false no isWin pois a aposta ainda não tem resultado
+        levelRewards = await addBetRewards(session.user.id, bet, false);
+        
+        console.log('Recompensas de nível adicionadas:', levelRewards);
+        
+        // Se houve subida de nível, registre no log
+        if (levelRewards.levelUp) {
+          console.log(`Usuário ${session.user.id} subiu do nível ${levelRewards.oldLevel} para ${levelRewards.newLevel}!`);
+        }
+      } catch (rewardsError) {
+        // Não falhar a operação principal se as recompensas falharem
+        console.error('Erro ao adicionar recompensas de nível:', rewardsError);
+      }
     } catch (txError) {
       console.error('Erro na transação:', txError);
       throw new Error('Falha ao registrar aposta: ' + 
         (txError instanceof Error ? txError.message : 'Erro desconhecido'));
     }
     
-    // Retornar sucesso
+    // Retornar sucesso, incluindo informações do nível se disponível
     return res.status(200).json({ 
       success: true, 
       bet: bet,
+      betId: bet.id, // Adicionar ID diretamente para compatibilidade
       newBalance: newBalance,
-      dailyTotal: dailyTotal + amount
+      dailyTotal: dailyTotal + amount,
+      level: levelRewards ? {
+        addedXP: levelRewards.addedXP,
+        addedPoints: levelRewards.addedPoints,
+        levelUp: levelRewards.levelUp,
+        newLevel: levelRewards.levelUp ? levelRewards.newLevel : undefined
+      } : undefined
     });
     
   } catch (error) {

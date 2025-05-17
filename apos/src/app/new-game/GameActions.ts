@@ -80,11 +80,21 @@ export const createGameActions = ({
       if (response.ok) {
         console.log('Aposta colocada com sucesso:', data);
         
+        // Lidar com recompensas de nível
+        if (data.level) {
+          console.log('Recompensas de nível:', data.level);
+          
+          if (data.level.levelUp) {
+            console.log(`Level up! Novo nível: ${data.level.newLevel}`);
+            // TODO: Mostrar notificação de level up
+          }
+        }
+        
         if (socket && socket.connected) {
           socket.emit('placeBet', { 
             amount, 
             roundId, 
-            betId: data.betId,
+            betId: data.bet?.id || data.betId,
             isAutoBet: isAuto
           });
         }
@@ -156,17 +166,36 @@ export const createGameActions = ({
       
       if (response.ok) {
         console.log('CashOut realizado com sucesso:', responseData);
+        
+        // Usar o multiplicador final do servidor (que já inclui o bônus)
+        const serverFinalMultiplier = responseData.finalMultiplier || finalMultiplier;
+        const actualWinnings = responseData.winAmount || (placedBet.amount * serverFinalMultiplier);
+        
         setCashedOut(true);
-        setCashOutMultiplier(finalMultiplier);
-        const winnings = placedBet.amount * finalMultiplier;
-        setWinAmount(winnings);
+        setCashOutMultiplier(serverFinalMultiplier);
+        setWinAmount(actualWinnings);
         updateBalance(responseData.newBalance);
+        
+        // Lidar com recompensas de nível
+        if (responseData.level) {
+          console.log('Recompensas de nível:', responseData.level);
+          
+          if (responseData.level.levelUp) {
+            console.log(`Level up! Novo nível: ${responseData.level.newLevel}`);
+            // TODO: Mostrar notificação de level up
+          }
+        }
+        
+        // Mostrar bônus aplicado
+        if (responseData.bonusMultiplier > 0) {
+          console.log(`Bônus de nível aplicado: +${(responseData.bonusMultiplier * 100).toFixed(1)}%`);
+        }
         
         if (socket && socket.connected) {
           socket.emit('cashOut', { 
             roundId, 
-            multiplier: finalMultiplier, 
-            amount: winnings,
+            multiplier: serverFinalMultiplier,
+            amount: actualWinnings,
             isAutoCashOut: isAuto
           });
         }
