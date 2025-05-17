@@ -603,7 +603,9 @@ const MultiplierSocketHandler = async (req: NextApiRequest, res: NextApiResponse
         }
       }).catch((err: Error) => console.error('Erro ao atualizar status da rodada:', err));
       
-      // Processar apostas não resgatadas com base no resultado final
+      // Processar apostas não resgatadas com base no resultado final (Sistema Trader)
+      // IMPORTANTE: No sistema trader, o usuário SEMPRE recebe valor_apostado × multiplicador_final
+      // Mesmo que o multiplicador seja menor que 1.0, o usuário recebe algo de volta
       try {
         // Buscar todas as apostas registradas para esta rodada
         const betsInDB = await prisma.bet.findMany({
@@ -614,7 +616,11 @@ const MultiplierSocketHandler = async (req: NextApiRequest, res: NextApiResponse
           include: { user: true }
         });
         
-        console.log(`Processando ${betsInDB.length} apostas pendentes para a rodada ${gameState.roundId}`);
+        console.log(`\n=== PROCESSANDO APOSTAS NO FIM DA RODADA (SOCKET) ===`);
+        console.log(`Rodada: ${gameState.roundId}`);
+        console.log(`Multiplicador final: ${finalMultiplier}x`);
+        console.log(`Total de apostas pendentes: ${betsInDB.length}`);
+        console.log(`==================================================`);
         
         // Para cada aposta, atualizar o resultado e o saldo do usuário
         for (const bet of betsInDB) {
@@ -625,9 +631,8 @@ const MultiplierSocketHandler = async (req: NextApiRequest, res: NextApiResponse
             // Pular se já fez cash-out
             if (hasCashOut) continue;
             
-            // Calcular o valor com base no multiplicador final
+            // Calcular o valor com base no multiplicador final (estilo trader)
             const resultAmount = parseFloat((bet.amount * finalMultiplier).toFixed(2));
-            const isWin = finalMultiplier >= 1.0;
             
             // Atualizar o status da aposta
             await prisma.bet.update({
@@ -640,33 +645,38 @@ const MultiplierSocketHandler = async (req: NextApiRequest, res: NextApiResponse
               }
             });
             
-            // Se ganhou, atualizar o saldo do usuário
-            if (isWin) {
-              await prisma.user.update({
-                where: { id: bet.userId },
-                data: {
-                  balance: {
-                    increment: resultAmount
-                  }
+            // SEMPRE atualizar o saldo do usuário (sistema trader)
+            // O valor retornado é sempre aposta × multiplicador
+            await prisma.user.update({
+              where: { id: bet.userId },
+              data: {
+                balance: {
+                  increment: resultAmount
                 }
-              });
-              
-              // Atualizar saldo da casa
-              // @ts-ignore - O modelo houseBalance existe no schema mas não no tipo PrismaClient
-              await prisma.houseBalance.update({
-                where: { gameType: "multiplicador" },
-                data: {
-                  balance: {
-                    decrement: resultAmount
-                  },
-                  totalPayout: {
-                    increment: resultAmount
-                  }
+              }
+            });
+            
+            // Atualizar saldo da casa
+            // @ts-ignore - O modelo houseBalance existe no schema mas não no tipo PrismaClient
+            await prisma.houseBalance.update({
+              where: { gameType: "multiplicador" },
+              data: {
+                balance: {
+                  decrement: resultAmount
+                },
+                totalPayout: {
+                  increment: resultAmount
                 }
-              });
-              
-              console.log(`Usuário ${bet.userId} ganhou R$ ${resultAmount.toFixed(2)} com a aposta ${bet.id}`);
-            }
+              }
+            });
+            
+            console.log(`\n[SOCKET] Processamento de aposta:`);
+            console.log(`- Usuário: ${bet.userId}`);
+            console.log(`- Aposta: R$ ${bet.amount}`);
+            console.log(`- Multiplicador: ${finalMultiplier}x`);
+            console.log(`- Valor recebido: R$ ${resultAmount.toFixed(2)}`);
+            console.log(`- Status: ${finalMultiplier < 1 ? 'RETORNO PARCIAL' : 'LUCRO'}`);
+            console.log(`- Saldo incrementado em: R$ ${resultAmount.toFixed(2)}`);
           } catch (betUpdateError) {
             console.error(`Erro ao processar aposta ${bet.id}:`, betUpdateError);
           }
@@ -679,8 +689,21 @@ const MultiplierSocketHandler = async (req: NextApiRequest, res: NextApiResponse
       io.emit('gamePhaseChange', 'ended');
       io.emit('gameEnded', {
         finalMultiplier: finalMultiplier,
+        roundId: gameState.roundId,
         bets: gameState.bets,
         cashOuts: gameState.cashOuts
+      });
+      
+      // Também emitir um gameState atualizado com o multiplicador final
+      io.emit('gameState', {
+        phase: 'ended',
+        roundId: gameState.roundId,
+        multiplier: finalMultiplier,
+        finalMultiplier: finalMultiplier,
+        timeLeft: 0,
+        bets: gameState.bets,
+        cashOuts: gameState.cashOuts,
+        connectedPlayers: Object.keys(gameState.players).length
       });
       
       console.log('Rodada finalizada, multiplicador final:', finalMultiplier);

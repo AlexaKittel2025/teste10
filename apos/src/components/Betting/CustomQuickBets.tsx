@@ -26,9 +26,17 @@ const CustomQuickBets: React.FC<CustomQuickBetsProps> = ({
   className = '',
 }) => {
   const [showConfig, setShowConfig] = useState(false);
-  const [customBets, setCustomBets] = useState<number[]>(defaultBets);
+  const [customBets, setCustomBets] = useState<number[]>(defaultBets || [5, 10, 20, 50, 100]);
   const [newBet, setNewBet] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
+
+  // Garantir que sempre temos um array válido
+  useEffect(() => {
+    if (!customBets || !Array.isArray(customBets) || customBets.length === 0) {
+      const fallbackBets = defaultBets || [5, 10, 20, 50, 100];
+      setCustomBets(fallbackBets);
+    }
+  }, [customBets, defaultBets]);
 
   // Carregar configurações salvas quando o componente montar
   useEffect(() => {
@@ -36,8 +44,10 @@ const CustomQuickBets: React.FC<CustomQuickBetsProps> = ({
       const savedBets = localStorage.getItem('customQuickBets');
       if (savedBets) {
         const parsedBets = JSON.parse(savedBets);
-        setCustomBets(parsedBets);
-        onBetsChange(parsedBets);
+        if (Array.isArray(parsedBets) && parsedBets.length > 0) {
+          setCustomBets(parsedBets);
+          onBetsChange(parsedBets);
+        }
       }
     } catch (error) {
       console.error('Erro ao carregar apostas rápidas personalizadas:', error);
@@ -93,11 +103,14 @@ const CustomQuickBets: React.FC<CustomQuickBetsProps> = ({
   // Log para debug
   console.log("Renderizando CustomQuickBets:", { showConfig, customBets, selectedBet, userBalance });
 
+  // Garantir segurança antes de renderizar
+  const safeBets = Array.isArray(customBets) ? customBets : defaultBets || [5, 10, 20, 50, 100];
+
   return (
     <div className={className}>
       {!showConfig ? (
         <div className="grid grid-cols-5 gap-2 quick-bet-buttons">
-          {customBets.map((bet, index) => (
+          {safeBets.map((bet, index) => (
             <Button
               key={bet}
               onClick={() => onSelectBet(bet)}

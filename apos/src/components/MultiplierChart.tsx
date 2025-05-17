@@ -20,7 +20,8 @@ const MultiplierChart = ({
   
   // Process multiplier history for display
   useEffect(() => {
-    if (multiplierHistory.length === 0) return;
+    // Verificar se multiplierHistory existe e é um array
+    if (!multiplierHistory || !Array.isArray(multiplierHistory) || multiplierHistory.length === 0) return;
     
     // Take only the last maxBars elements
     const lastN = multiplierHistory.slice(-maxBars);

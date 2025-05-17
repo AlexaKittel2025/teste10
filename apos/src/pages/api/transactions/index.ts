@@ -61,64 +61,93 @@ export default async function handler(
       const status = type === 'WITHDRAWAL' ? 'PENDING' : 'COMPLETED';
       
       // Preparar os detalhes da transação de forma mais segura
-      let detailsString = "{}";
-      try {
-        const detailsObj = {
-          pixKey: pixKey || '',
-          method: method || 'pix'
-        };
-        detailsString = JSON.stringify(detailsObj);
-      } catch (error) {
-        console.error('Erro ao serializar detalhes da transação:', error);
-        // Usar objeto vazio em caso de erro
-        detailsString = "{}";
-      }
+      let detailsObj = {
+        pixKey: pixKey || '',
+        method: method || 'pix'
+      };
+      let detailsString = JSON.stringify(detailsObj);
 
-      console.log('Criando transação...');
-      const transaction = await prisma.transaction.create({
-        data: {
-          amount: numericAmount,
-          type,
-          status,
-          userId: user.id,
-          details: detailsString
-        },
+      console.log('Criando transação com detalhes:', detailsString);
+      
+      // Usar transação do banco para garantir consistência
+      const result = await prisma.$transaction(async (prisma) => {
+        // Criar a transação com apenas campos básicos
+        const transaction = await prisma.transaction.create({
+          data: {
+            amount: numericAmount,
+            type,
+            status,
+            userId: user.id,
+            details: detailsString
+          },
+          select: {
+            id: true,
+            userId: true,
+            amount: true,
+            type: true,
+            status: true,
+            details: true,
+            createdAt: true,
+            updatedAt: true
+          }
+        });
+
+        console.log('Transação criada com sucesso, ID:', transaction.id);
+        
+        // Para saques, sempre debitar imediatamente
+        if (type === 'WITHDRAWAL') {
+          const updatedUser = await prisma.user.update({
+            where: { id: user.id },
+            data: {
+              balance: {
+                decrement: numericAmount,
+              },
+            },
+          });
+          console.log(`Saldo debitado: -${numericAmount}, novo saldo: ${updatedUser.balance}`);
+        } 
+        // Para depósitos, creditar imediatamente
+        else if (type === 'DEPOSIT') {
+          const updatedUser = await prisma.user.update({
+            where: { id: user.id },
+            data: {
+              balance: {
+                increment: numericAmount,
+              },
+            },
+          });
+          console.log(`Saldo creditado: +${numericAmount}, novo saldo: ${updatedUser.balance}`);
+        }
+
+        return transaction;
       });
 
-      console.log('Transação criada com sucesso, ID:', transaction.id);
-      console.log('Atualizando saldo do usuário...');
-      
-      // Para saques, sempre debitar imediatamente
-      if (type === 'WITHDRAWAL') {
-        await prisma.user.update({
-          where: { id: user.id },
-          data: {
-            balance: {
-              decrement: numericAmount,
-            },
-          },
-        });
-        console.log(`Saldo debitado: -${numericAmount}, novo saldo: ${user.balance - numericAmount}`);
-      } 
-      // Para depósitos, creditar imediatamente
-      else if (type === 'DEPOSIT') {
-        await prisma.user.update({
-          where: { id: user.id },
-          data: {
-            balance: {
-              increment: numericAmount,
-            },
-          },
-        });
-        console.log(`Saldo creditado: +${numericAmount}, novo saldo: ${user.balance + numericAmount}`);
-      }
-
-      console.log('Transação concluída com sucesso:', transaction.id);
-      return res.status(201).json(transaction);
+      console.log('Transação concluída com sucesso:', result.id);
+      return res.status(201).json(result);
     } catch (error) {
       console.error('Erro ao criar transação:', error);
       // Retornar mais detalhes sobre o erro para facilitar o diagnóstico
-      const errorMessage = error instanceof Error ? error.message : 'Erro interno do servidor';
+      let errorMessage = 'Erro interno do servidor';
+      
+      if (error instanceof Error) {
+        errorMessage = error.message;
+        
+        // Se for erro do Prisma relacionado a saldo
+        if (error.message.includes('balance') || error.message.includes('constraint')) {
+          errorMessage = 'Saldo insuficiente para realizar esta operação';
+        }
+        // Se for erro de validação
+        else if (error.message.includes('validation') || error.message.includes('required')) {
+          errorMessage = 'Dados inválidos fornecidos. Verifique os campos e tente novamente.';
+        }
+      }
+      
+      console.error('Erro detalhado:', {
+        message: errorMessage,
+        type: error instanceof Error ? error.constructor.name : typeof error,
+        stack: error instanceof Error ? error.stack : 'N/A'
+      });
+      
       return res.status(500).json({ message: errorMessage });
     }
   }

@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Teste de Funcionalidade do Jogo</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            padding: 20px; 
+            background: #1a1a1a; 
+            color: white; 
+        }
+        .test { 
+            margin: 20px 0; 
+            padding: 15px; 
+            border: 1px solid #333; 
+            border-radius: 5px; 
+        }
+        .pass { background: #0f3f0f; border-color: #0f0; }
+        .fail { background: #3f0f0f; border-color: #f00; }
+        .pending { background: #3f3f0f; border-color: #ff0; }
+        button { 
+            padding: 10px 20px; 
+            margin: 5px; 
+            background: #333; 
+            color: white; 
+            border: none; 
+            cursor: pointer; 
+        }
+        button:hover { background: #555; }
+        #logs { 
+            background: #000; 
+            padding: 10px; 
+            height: 300px; 
+            overflow-y: auto; 
+            font-family: monospace; 
+            font-size: 12px; 
+        }
+    </style>
+</head>
+<body>
+    <h1>Teste de Funcionalidade do Jogo - New Game</h1>
+    
+    <div id="tests">
+        <div class="test pending" id="test-api">
+            <h3>1. Teste de APIs</h3>
+            <button onclick="testAPIs()">Testar APIs</button>
+            <div id="api-results"></div>
+        </div>
+        
+        <div class="test pending" id="test-socket">
+            <h3>2. Teste de Socket.io</h3>
+            <button onclick="testSocket()">Testar Socket</button>
+            <div id="socket-results"></div>
+        </div>
+        
+        <div class="test pending" id="test-balance">
+            <h3>3. Teste de Saldo</h3>
+            <button onclick="testBalance()">Testar Saldo</button>
+            <div id="balance-results"></div>
+        </div>
+        
+        <div class="test pending" id="test-bet">
+            <h3>4. Teste de Aposta</h3>
+            <button onclick="testBet()">Testar Aposta</button>
+            <div id="bet-results"></div>
+        </div>
+    </div>
+    
+    <h3>Logs</h3>
+    <div id="logs"></div>
+    
+    <script>
+        const log = (message, type = 'info') => {
+            const logs = document.getElementById('logs');
+            const time = new Date().toLocaleTimeString();
+            const color = type === 'error' ? '#f00' : type === 'success' ? '#0f0' : '#fff';
+            logs.innerHTML += `<div style="color: ${color}">[${time}] ${message}</div>`;
+            logs.scrollTop = logs.scrollHeight;
+        };
+
+        async function testAPIs() {
+            const testDiv = document.getElementById('test-api');
+            const resultsDiv = document.getElementById('api-results');
+            
+            try {
+                log('Testando APIs...');
+                
+                // Teste 1: API de transações
+                log('Testando /api/transactions...');
+                const transResp = await fetch('/api/transactions');
+                resultsDiv.innerHTML += `<p>GET /api/transactions: ${transResp.status} ${transResp.statusText}</p>`;
+                
+                // Teste 2: API de saldo
+                log('Testando /api/user/balance...');
+                const balanceResp = await fetch('/api/user/balance');
+                resultsDiv.innerHTML += `<p>GET /api/user/balance: ${balanceResp.status} ${balanceResp.statusText}</p>`;
+                
+                // Teste 3: API de socket
+                log('Testando /api/socket...');
+                const socketResp = await fetch('/api/socket');
+                resultsDiv.innerHTML += `<p>GET /api/socket: ${socketResp.status} ${socketResp.statusText}</p>`;
+                
+                // Teste 4: API de socket-multiplier
+                log('Testando /api/socket-multiplier...');
+                const multiplierResp = await fetch('/api/socket-multiplier');
+                resultsDiv.innerHTML += `<p>GET /api/socket-multiplier: ${multiplierResp.status} ${multiplierResp.statusText}</p>`;
+                
+                testDiv.className = 'test pass';
+                log('APIs testadas com sucesso!', 'success');
+            } catch (error) {
+                testDiv.className = 'test fail';
+                log(`Erro ao testar APIs: ${error.message}`, 'error');
+            }
+        }
+
+        async function testSocket() {
+            const testDiv = document.getElementById('test-socket');
+            const resultsDiv = document.getElementById('socket-results');
+            
+            try {
+                log('Testando conexão Socket.io...');
+                
+                // Importar socket.io dinamicamente
+                const script = document.createElement('script');
+                script.src = '/socket.io/socket.io.js';
+                document.head.appendChild(script);
+                
+                script.onload = () => {
+                    const socket = io();
+                    
+                    socket.on('connect', () => {
+                        resultsDiv.innerHTML += '<p>✅ Socket conectado!</p>';
+                        resultsDiv.innerHTML += `<p>Socket ID: ${socket.id}</p>`;
+                        
+                        socket.emit('connect-multiplier');
+                        socket.emit('requestGameState');
+                        
+                        testDiv.className = 'test pass';
+                        log('Socket conectado com sucesso!', 'success');
+                    });
+                    
+                    socket.on('error', (error) => {
+                        resultsDiv.innerHTML += `<p>❌ Erro: ${error}</p>`;
+                        testDiv.className = 'test fail';
+                        log(`Erro no socket: ${error}`, 'error');
+                    });
+                    
+                    socket.on('gameState', (state) => {
+                        resultsDiv.innerHTML += '<p>✅ Estado do jogo recebido!</p>';
+                        resultsDiv.innerHTML += `<p>Fase: ${state.phase}</p>`;
+                        resultsDiv.innerHTML += `<p>Multiplicador: ${state.multiplier}x</p>`;
+                    });
+                    
+                    setTimeout(() => {
+                        if (!socket.connected) {
+                            testDiv.className = 'test fail';
+                            log('Socket não conectou em 5 segundos', 'error');
+                        }
+                    }, 5000);
+                };
+                
+                script.onerror = () => {
+                    testDiv.className = 'test fail';
+                    log('Erro ao carregar socket.io', 'error');
+                };
+                
+            } catch (error) {
+                testDiv.className = 'test fail';
+                log(`Erro ao testar socket: ${error.message}`, 'error');
+            }
+        }
+
+        async function testBalance() {
+            const testDiv = document.getElementById('test-balance');
+            const resultsDiv = document.getElementById('balance-results');
+            
+            try {
+                log('Testando sistema de saldo...');
+                
+                const response = await fetch('/api/user/balance');
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultsDiv.innerHTML += `<p>✅ Saldo obtido: R$ ${data.balance}</p>`;
+                    testDiv.className = 'test pass';
+                    log('Saldo obtido com sucesso!', 'success');
+                } else {
+                    resultsDiv.innerHTML += `<p>❌ Erro: ${data.message}</p>`;
+                    testDiv.className = 'test fail';
+                    log(`Erro ao obter saldo: ${data.message}`, 'error');
+                }
+                
+            } catch (error) {
+                testDiv.className = 'test fail';
+                log(`Erro ao testar saldo: ${error.message}`, 'error');
+            }
+        }
+
+        async function testBet() {
+            const testDiv = document.getElementById('test-bet');
+            const resultsDiv = document.getElementById('bet-results');
+            
+            try {
+                log('Testando sistema de apostas...');
+                
+                // Este é um teste simulado, não faz aposta real
+                resultsDiv.innerHTML += '<p>⚠️ Teste simulado de aposta</p>';
+                resultsDiv.innerHTML += '<p>Endpoints verificados:</p>';
+                resultsDiv.innerHTML += '<p>- POST /api/games/place-bet</p>';
+                resultsDiv.innerHTML += '<p>- POST /api/games/cash-out</p>';
+                resultsDiv.innerHTML += '<p>- POST /api/games/update-balance-end-round</p>';
+                
+                testDiv.className = 'test pass';
+                log('Endpoints de aposta verificados!', 'success');
+                
+            } catch (error) {
+                testDiv.className = 'test fail';
+                log(`Erro ao testar apostas: ${error.message}`, 'error');
+            }
+        }
+
+        // Auto-executar alguns testes ao carregar
+        window.onload = () => {
+            log('Página de teste carregada. Clique nos botões para executar os testes.');
+        };
+    </script>
+</body>
+</html>

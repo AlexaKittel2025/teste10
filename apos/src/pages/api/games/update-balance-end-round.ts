@@ -78,8 +78,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ message: 'Erro no cálculo do valor de retorno' });
     }
     
-    console.log(`Calculando ganho no fim da rodada: ${bet.amount} x ${multiplier} = ${winAmount}`);
-    console.log(`IMPORTANTE: multiplicador ${multiplier < 1 ? 'é menor que 1.00, mas ainda' : 'é maior que 1.00 e'} adicionará ${winAmount.toFixed(2)} ao saldo do usuário`);
+    console.log('=== PROCESSANDO FIM DE RODADA (SISTEMA TRADER) ===');
+    console.log(`Aposta: R$ ${bet.amount}`);
+    console.log(`Multiplicador: ${multiplier}x`);
+    console.log(`Valor a receber: R$ ${winAmount.toFixed(2)}`);
+    console.log(`Tipo: ${multiplier < 1 ? 'RETORNO PARCIAL' : 'LUCRO'}`);
+    console.log(`IMPORTANTE: No sistema trader, o usuário SEMPRE recebe aposta × multiplicador`);
+    console.log('================================================');
     
     let updatedBet, newBalance, levelRewards;
     

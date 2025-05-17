@@ -611,45 +611,36 @@ export default function ProfilePage() {
         method
       });
       
-      // Usar o mecanismo de retry para transações
-      const response = await retryOperation(async () => {
-        const resp = await fetch('/api/transactions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ 
-            amount: amount,
-            type: 'WITHDRAWAL',
-            pixKey: withdrawDetailsValue,
-            method: method
-          }),
-        });
-        
-        if (!resp.ok) {
-          const errorData = await resp.json().catch(() => ({ message: 'Erro ao processar resposta do servidor' }));
-          console.error('Resposta de erro completa:', errorData);
-          throw new Error(errorData.message || 'Erro ao processar saque');
-        }
-        
-        return resp;
-      }, 2); // tentar no máximo 2 vezes
+      // Fazer a requisição diretamente sem retry
+      const response = await fetch('/api/transactions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          amount: amount,
+          type: 'WITHDRAWAL',
+          pixKey: withdrawDetailsValue,
+          method: method
+        }),
+      });
       
-      // Se chegou aqui, o saque foi processado com sucesso
+      // Se chegou aqui, processar a resposta
       const transactionData = await response.json();
+      
+      if (!response.ok) {
+        console.error('Resposta de erro:', transactionData);
+        throw new Error(transactionData.message || 'Erro ao processar saque');
+      }
+      
       console.log('Saque processado com sucesso:', transactionData);
       
       // Limpar formulário
       setWithdrawAmount('');
       setWithdrawDetailsValue('');
       
-      // Atualizar o saldo imediatamente
-      updateBalance(userBalance - amount);
-      
-      // Se a transação foi concluída imediatamente, atualizar o total
-      if (transactionData.status === 'COMPLETED') {
-        setTotalWithdrawals(prevTotal => prevTotal + amount);
-      }
+      // Atualizar o saldo imediatamente (já foi debitado no backend)
+      await refreshBalance();
       
       // Mostrar mensagem de sucesso
       setSuccessMessage(`Saque de R$ ${amount.toFixed(2)} solicitado com sucesso! Status: Pendente`);
@@ -662,7 +653,16 @@ export default function ProfilePage() {
       fetchTransactions();
     } catch (error: any) {
       console.error('Erro ao processar saque:', error);
-      setErrorMessage(error.message || 'Erro ao processar saque. Tente novamente.');
+      
+      // Mensagem de erro mais específica
+      let errorMsg = 'Erro ao processar saque. ';
+      if (error.message.includes('saldo') || error.message.includes('balance')) {
+        errorMsg = 'Saldo insuficiente para realizar este saque.';
+      } else {
+        errorMsg += error.message || 'Tente novamente.';
+      }
+      
+      setErrorMessage(errorMsg);
       setTimeout(() => setErrorMessage(''), 5000);
     } finally {
       setLoading(false);

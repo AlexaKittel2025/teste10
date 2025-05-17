@@ -16,7 +16,7 @@ const MultiplierChart: React.FC<MultiplierChartProps> = ({ multiplierHistory, cu
   }, [multiplierHistory, currentPhase]);
 
   // Não renderiza nada quando não está em fase de jogo ou não há dados
-  if (currentPhase !== 'running' || multiplierHistory.length === 0) {
+  if (currentPhase !== 'running' || !multiplierHistory || !Array.isArray(multiplierHistory) || multiplierHistory.length === 0) {
     return null;
   }
 

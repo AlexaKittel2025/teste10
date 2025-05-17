@@ -297,6 +297,11 @@ export default function AdminPanel() {
   const updateWithdrawalStatus = async (transactionId: string, status: string) => {
     try {
       setLoading(true);
+      setErrorMessage('');
+      setSuccessMessage('');
+      
+      console.log('Atualizando status da transação:', { transactionId, status });
+      
       const response = await fetch('/api/admin/transactions/update-status', {
         method: 'POST',
         headers: {
@@ -308,16 +313,21 @@ export default function AdminPanel() {
         }),
       });
 
+      const data = await response.json();
+      
       if (response.ok) {
-        fetchWithdrawals();
         setSuccessMessage('Status do saque atualizado com sucesso');
+        // Recarregar lista de saques após 1 segundo para dar tempo da UI atualizar
+        setTimeout(() => {
+          fetchWithdrawals();
+        }, 1000);
       } else {
-        const error = await response.json();
-        setErrorMessage(error.message || 'Erro ao atualizar status');
+        console.error('Erro ao atualizar status:', data);
+        setErrorMessage(data.message || 'Erro ao atualizar status');
       }
     } catch (error) {
       console.error('Erro ao atualizar status:', error);
-      setErrorMessage('Erro ao atualizar status');
+      setErrorMessage('Erro de conexão ao atualizar status');
     } finally {
       setLoading(false);
     }
@@ -367,12 +377,25 @@ export default function AdminPanel() {
   };
 
   const rechargeUserBalance = async () => {
-    if (!foundUser || rechargeAmount <= 0) return;
+    if (!foundUser) {
+      setErrorMessage('Nenhum usuário selecionado');
+      return;
+    }
+    
+    if (rechargeAmount <= 0) {
+      setErrorMessage('Valor deve ser maior que zero');
+      return;
+    }
     
     try {
       setLoading(true);
       setSuccessMessage('');
       setErrorMessage('');
+      
+      console.log('[ADMIN] Enviando recarga:', {
+        userId: foundUser.id,
+        amount: rechargeAmount
+      });
       
       const response = await fetch('/api/admin/recharge', {
         method: 'POST',
@@ -385,17 +408,21 @@ export default function AdminPanel() {
         }),
       });
 
+      const data = await response.json();
+      console.log('[ADMIN] Resposta recebida:', response.status, data);
+
       if (response.ok) {
-        const updatedUser = await response.json();
-        setFoundUser(updatedUser);
-        setSuccessMessage(`Saldo adicionado com sucesso! Novo saldo: R$ ${updatedUser.balance.toFixed(2)}`);
+        setFoundUser(data);
+        setSuccessMessage(`Saldo adicionado com sucesso! Novo saldo: R$ ${data.balance.toFixed(2)}`);
+        // Limpar o campo de valor após sucesso
+        setRechargeAmount(100);
       } else {
-        const error = await response.json();
-        setErrorMessage(error.message || 'Erro ao adicionar saldo');
+        console.error('[ADMIN] Erro ao adicionar saldo:', data);
+        setErrorMessage(data.message || 'Erro ao adicionar saldo');
       }
     } catch (error) {
-      console.error('Erro ao adicionar saldo:', error);
-      setErrorMessage('Erro ao adicionar saldo');
+      console.error('[ADMIN] Erro ao adicionar saldo:', error);
+      setErrorMessage('Erro de conexão ao adicionar saldo');
     } finally {
       setLoading(false);
     }
